@@ -1298,89 +1298,104 @@ async function updateAppWithShadcnExamples(targetPath) {
       }
     }
 
-    // Check if login component accepts onLogin prop or if we need to wrap it
-    const hasOnLoginProp = loginContent.includes('onLogin') || loginContent.includes('onSubmit');
-    const hasNavigate = loginContent.includes('useNavigate');
-    
-    // Create App.tsx with routing
-    let appContent;
-    if (hasOnLoginProp) {
-      // Component accepts onLogin/onSubmit prop
-      appContent = `import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import ${loginComponent} from './${loginRelative}'
-import ${dashboardComponent} from './${dashboardRelative}'
-
-// Wrap login to add navigation
-function Login() {
-  const navigate = useNavigate()
-  
-  const handleLogin = () => {
-    // Accept any username/password and navigate to dashboard
-    navigate('/dashboard')
-  }
-  
-  return <${loginComponent} onLogin={handleLogin} onSubmit={handleLogin} />
-}
-
-function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<Login />} />
-      <Route path="/dashboard" element={<${dashboardComponent} />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  )
-}
-
-export default App
-`;
-    } else {
-      // Wrap login to intercept form submissions
-      appContent = `import { useEffect, useRef } from 'react'
+    // Always wrap login-01 to intercept form submissions and navigate to dashboard-01
+    // This ensures any username/password is accepted and navigates to dashboard-01
+    const appContent = `import { useEffect, useRef } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import ${loginComponent} from './${loginRelative}'
 import ${dashboardComponent} from './${dashboardRelative}'
 
-// Wrap login to add navigation
+// Wrap login-01 to intercept form submissions and navigate to dashboard-01
+// Accepts any username/password - no validation required
 function Login() {
   const navigate = useNavigate()
   const containerRef = useRef<HTMLDivElement>(null)
   
   useEffect(() => {
-    // Intercept form submissions to navigate to dashboard
-    // Accept any username/password
+    // Intercept form submissions to navigate to dashboard-01
+    // Accept any username/password - no validation needed
     const container = containerRef.current
     if (!container) return
+    
+    const navigateToDashboard = () => {
+      // Navigate to dashboard-01 after any login attempt
+      navigate('/dashboard')
+    }
     
     const handleSubmit = (e: Event) => {
       e.preventDefault()
       e.stopPropagation()
-      navigate('/dashboard')
+      e.stopImmediatePropagation()
+      navigateToDashboard()
       return false
     }
     
-    // Find all forms and intercept their submit events
+    // Find all forms and intercept their submit events (capture phase - before React handlers)
     const forms = container.querySelectorAll('form')
     forms.forEach(form => {
-      form.addEventListener('submit', handleSubmit, true)
+      // Override the form's submit handler
+      const originalSubmit = form.onsubmit
+      form.onsubmit = handleSubmit
+      // Also add event listener in capture phase to catch before React
+      form.addEventListener('submit', handleSubmit, { capture: true, passive: false })
     })
     
-    // Also intercept button clicks that might trigger navigation
-    const buttons = container.querySelectorAll('button[type="submit"]')
-    buttons.forEach(button => {
-      button.addEventListener('click', (e) => {
+    // Intercept button clicks that might trigger form submission
+    const submitButtons = container.querySelectorAll('button[type="submit"], button:not([type])')
+    submitButtons.forEach(button => {
+      const handleClick = (e: MouseEvent) => {
         const form = button.closest('form')
         if (form) {
           e.preventDefault()
-          navigate('/dashboard')
+          e.stopPropagation()
+          e.stopImmediatePropagation()
+          navigateToDashboard()
         }
-      }, true)
+      }
+      // Use capture phase to intercept before React handlers
+      button.addEventListener('click', handleClick, { capture: true, passive: false })
+    })
+    
+    // Handle Enter key presses in input fields
+    const inputs = container.querySelectorAll('input[type="email"], input[type="text"], input[type="password"]')
+    inputs.forEach(input => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Enter') {
+          const form = input.closest('form')
+          if (form) {
+            e.preventDefault()
+            e.stopPropagation()
+            navigateToDashboard()
+          }
+        }
+      }
+      input.addEventListener('keydown', handleKeyDown, { capture: true, passive: false })
+    })
+    
+    // Use MutationObserver to catch dynamically added forms/buttons
+    const observer = new MutationObserver(() => {
+      // Re-apply handlers for any newly added forms/buttons
+      const newForms = container.querySelectorAll('form')
+      newForms.forEach(form => {
+        if (!form.hasAttribute('data-login-handled')) {
+          form.setAttribute('data-login-handled', 'true')
+          form.onsubmit = handleSubmit
+          form.addEventListener('submit', handleSubmit, { capture: true, passive: false })
+        }
+      })
+    })
+    
+    observer.observe(container, {
+      childList: true,
+      subtree: true
     })
     
     return () => {
       forms.forEach(form => {
-        form.removeEventListener('submit', handleSubmit, true)
+        form.removeEventListener('submit', handleSubmit, { capture: true } as any)
+        form.onsubmit = null
       })
+      observer.disconnect()
     }
   }, [navigate])
   
@@ -1403,7 +1418,6 @@ function App() {
 
 export default App
 `;
-    }
 
     await fs.writeFile(appTsxPath, appContent);
   } else {

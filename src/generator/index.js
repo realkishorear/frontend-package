@@ -156,7 +156,42 @@ async function copyBaseFiles(basePath, targetPath, useTypeScript) {
       if (!useTypeScript && (file === 'tsconfig.json' || file === 'tsconfig.node.json')) {
         continue;
       }
-      await fs.copy(srcPath, destPath);
+      
+      // Handle index.html - update main file extension and remove vite.svg reference
+      if (file === 'index.html') {
+        const htmlContent = await fs.readFile(srcPath, 'utf-8');
+        const mainExt = useTypeScript ? 'tsx' : 'jsx';
+        let updatedHtml = htmlContent.replace(
+          /src="\/src\/main\.(tsx|jsx)"/,
+          `src="/src/main.${mainExt}"`
+        );
+        // Remove or update vite.svg reference to avoid 404
+        updatedHtml = updatedHtml.replace(
+          /<link rel="icon"[^>]*vite\.svg[^>]*>/,
+          ''
+        );
+        await fs.writeFile(destPath, updatedHtml, 'utf-8');
+      } else {
+        await fs.copy(srcPath, destPath);
+      }
+    }
+  }
+  
+  // Ensure main file has CSS import
+  const mainExt = useTypeScript ? 'tsx' : 'jsx';
+  const mainPath = path.join(targetPath, 'src', `main.${mainExt}`);
+  if (await fs.pathExists(mainPath)) {
+    let mainContent = await fs.readFile(mainPath, 'utf-8');
+    // Ensure index.css import exists
+    if (!mainContent.includes("import './index.css'") && !mainContent.includes('import "./index.css"')) {
+      // Add index.css import after other imports
+      const importMatch = mainContent.match(/(import .+ from .+\n)+/);
+      if (importMatch) {
+        mainContent = mainContent.replace(/(import .+ from .+\n)+/, importMatch[0] + "import './index.css'\n");
+      } else {
+        mainContent = "import './index.css'\n" + mainContent;
+      }
+      await fs.writeFile(mainPath, mainContent, 'utf-8');
     }
   }
 }
@@ -260,28 +295,32 @@ export default {
   );
 
   const indexCssPath = path.join(targetPath, 'src', 'index.css');
-  const stylesDir = path.join(targetPath, 'src', 'styles');
   
   const tailwindCss = `@tailwind base;
 @tailwind components;
 @tailwind utilities;
 `;
 
-  if (await fs.pathExists(indexCssPath)) {
-    await fs.writeFile(indexCssPath, tailwindCss);
-  } else {
-    await fs.ensureDir(stylesDir);
-    await fs.writeFile(path.join(stylesDir, 'tailwind.css'), tailwindCss);
-    
-    const mainExt = useTypeScript ? 'tsx' : 'jsx';
-    const mainPath = path.join(targetPath, 'src', `main.${mainExt}`);
-    if (await fs.pathExists(mainPath)) {
-      let mainContent = await fs.readFile(mainPath, 'utf-8');
-      if (!mainContent.includes('tailwind.css') && !mainContent.includes('index.css')) {
-        mainContent = `import './styles/tailwind.css';\n${mainContent}`;
-        await fs.writeFile(mainPath, mainContent);
+  // Always use index.css for consistency
+  await fs.writeFile(indexCssPath, tailwindCss);
+  
+  // Ensure main file imports index.css
+  const mainExt = useTypeScript ? 'tsx' : 'jsx';
+  const mainPath = path.join(targetPath, 'src', `main.${mainExt}`);
+  if (await fs.pathExists(mainPath)) {
+    let mainContent = await fs.readFile(mainPath, 'utf-8');
+    // Remove any styles/tailwind.css imports
+    mainContent = mainContent.replace(/import\s+['"]\.\/styles\/tailwind\.css['"];?\n?/g, '');
+    // Add index.css import if not present
+    if (!mainContent.includes("import './index.css'") && !mainContent.includes('import "./index.css"')) {
+      const importMatch = mainContent.match(/(import .+ from .+\n)+/);
+      if (importMatch) {
+        mainContent = mainContent.replace(/(import .+ from .+\n)+/, importMatch[0] + "import './index.css'\n");
+      } else {
+        mainContent = "import './index.css'\n" + mainContent;
       }
     }
+    await fs.writeFile(mainPath, mainContent, 'utf-8');
   }
 }
 

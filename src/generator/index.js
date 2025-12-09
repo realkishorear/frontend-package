@@ -58,10 +58,8 @@ export async function generateProject(targetPath, answers) {
         const stat = await fs.stat(srcItem);
         
         if (stat.isDirectory()) {
-          // Copy entire directory
           await fs.copy(srcItem, targetItem);
-        } else {
-          // Copy all files (not just .tsx/.ts) to preserve any other assets
+        } else if (item.endsWith('.tsx') || item.endsWith('.ts')) {
           await fs.copy(srcItem, targetItem);
         }
       }
@@ -78,17 +76,9 @@ export async function generateProject(targetPath, answers) {
         // For dashboard and landing, import the main component
         const appTsxPath = path.join(targetSrcPath, 'App.tsx');
         const templateName = template === 'dashboard' ? 'Dashboard' : 'Landing';
-        const templateFilePath = path.join(targetSrcPath, `${templateName}.tsx`);
-        
-        // Verify template file exists
-        if (!(await fs.pathExists(templateFilePath))) {
-          throw new Error(`Template file ${templateName}.tsx not found in generated project`);
-        }
-        
         const templateImport = `import ${templateName} from './${templateName}'`;
         
-        const appContent = `import React from 'react'
-import { Routes, Route } from 'react-router-dom'
+        const appContent = `import { Routes, Route } from 'react-router-dom'
 ${templateImport}
 
 function App() {
@@ -144,39 +134,74 @@ export default App
         }
         packageJson.devDependencies['sass'] = '^1.69.0';
 
-        // Rename index.css to index.scss
+        // Create or convert index.css to index.scss
         const cssPath = path.join(targetSrcPath, 'index.css');
         const scssPath = path.join(targetSrcPath, 'index.scss');
         
+        let scssContent = '';
+        
         if (await fs.pathExists(cssPath)) {
           // Read existing CSS content (remove Tailwind directives if present)
-          let cssContent = await fs.readFile(cssPath, 'utf-8');
-          cssContent = cssContent.replace(/@tailwind\s+[^;]+;/g, '');
-          cssContent = cssContent.trim();
-          
-          // If empty, add basic SASS structure
-          if (!cssContent) {
-            cssContent = `// Main stylesheet\n\n* {\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n}\n\nbody {\n  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',\n    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',\n    sans-serif;\n  -webkit-font-smoothing: antialiased;\n  -moz-osx-font-smoothing: grayscale;\n}\n`;
-          }
-          
-          await fs.writeFile(scssPath, cssContent);
+          scssContent = await fs.readFile(cssPath, 'utf-8');
+          scssContent = scssContent.replace(/@tailwind\s+[^;]+;/g, '');
+          scssContent = scssContent.trim();
+        }
+        
+        // If empty or only had Tailwind, add basic SASS structure
+        if (!scssContent || scssContent.length === 0) {
+          scssContent = `// Main stylesheet
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+`;
+        }
+        
+        // Write SCSS file
+        await fs.writeFile(scssPath, scssContent);
+        console.log(chalk.green(`✅ Created ${path.basename(scssPath)}`));
+        
+        // Remove CSS file if it exists
+        if (await fs.pathExists(cssPath)) {
           await fs.remove(cssPath);
-        } else {
-          // Create new index.scss
-          const defaultScss = `// Main stylesheet\n\n* {\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n}\n\nbody {\n  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',\n    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',\n    sans-serif;\n  -webkit-font-smoothing: antialiased;\n  -moz-osx-font-smoothing: grayscale;\n}\n`;
-          await fs.writeFile(scssPath, defaultScss);
         }
 
         // Update main.tsx to import .scss instead of .css
         const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
         if (await fs.pathExists(mainTsxPath)) {
           let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+          
           // Replace any import of index.css with index.scss
+          // Use a single comprehensive regex that handles all cases
           mainContent = mainContent.replace(
-            /import\s+(['"])(.*\/)?index\.css\1/g, 
+            /import\s+(['"])([^'"]*\/)?index\.css\1/g,
             "import './index.scss'"
           );
+          
+          // Also handle any remaining references (fallback)
+          if (mainContent.includes('index.css') && !mainContent.includes('index.scss')) {
+            mainContent = mainContent.replace(/index\.css/g, 'index.scss');
+          }
+          
           await fs.writeFile(mainTsxPath, mainContent);
+          
+          // Verify the replacement worked
+          const updatedContent = await fs.readFile(mainTsxPath, 'utf-8');
+          if (updatedContent.includes('index.scss')) {
+            console.log(chalk.green('✅ Updated main.tsx to import index.scss'));
+          } else if (updatedContent.includes('index.css')) {
+            console.log(chalk.yellow('⚠️  Warning: Could not update import in main.tsx. Please manually change index.css to index.scss'));
+          }
         }
       } else if (cssFramework === 'css') {
         // Handle regular CSS
@@ -210,7 +235,10 @@ export default App
     }
 
     // Update package.json with component library dependencies if needed
+    // Read package.json fresh to ensure we have the latest version (after CSS framework changes)
     if (await fs.pathExists(packageJsonPath)) {
+      packageJson = await fs.readJson(packageJsonPath);
+      
       if (!packageJson.dependencies) {
         packageJson.dependencies = {};
       }
@@ -235,6 +263,17 @@ export default App
     });
 
     console.log(chalk.green('✅ Dependencies installed successfully!'));
+    
+    // Verify SCSS setup if SASS was selected
+    if (cssFramework === 'sass') {
+      const finalPackageJson = await fs.readJson(packageJsonPath);
+      if (finalPackageJson.devDependencies?.sass) {
+        console.log(chalk.green('✅ SASS is configured and ready to use'));
+        console.log(chalk.blue('💡 Vite will automatically compile your SCSS files when you run npm run dev'));
+      } else {
+        console.log(chalk.yellow('⚠️  Warning: SASS dependency may not have been installed correctly'));
+      }
+    }
 
   } catch (error) {
     console.error(chalk.red(`❌ Error generating project: ${error.message}`));

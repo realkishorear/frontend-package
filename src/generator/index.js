@@ -58,8 +58,10 @@ export async function generateProject(targetPath, answers) {
         const stat = await fs.stat(srcItem);
         
         if (stat.isDirectory()) {
+          // Copy entire directory
           await fs.copy(srcItem, targetItem);
-        } else if (item.endsWith('.tsx') || item.endsWith('.ts')) {
+        } else {
+          // Copy all files (not just .tsx/.ts) to preserve any other assets
           await fs.copy(srcItem, targetItem);
         }
       }
@@ -76,9 +78,17 @@ export async function generateProject(targetPath, answers) {
         // For dashboard and landing, import the main component
         const appTsxPath = path.join(targetSrcPath, 'App.tsx');
         const templateName = template === 'dashboard' ? 'Dashboard' : 'Landing';
+        const templateFilePath = path.join(targetSrcPath, `${templateName}.tsx`);
+        
+        // Verify template file exists
+        if (!(await fs.pathExists(templateFilePath))) {
+          throw new Error(`Template file ${templateName}.tsx not found in generated project`);
+        }
+        
         const templateImport = `import ${templateName} from './${templateName}'`;
         
-        const appContent = `import { Routes, Route } from 'react-router-dom'
+        const appContent = `import React from 'react'
+import { Routes, Route } from 'react-router-dom'
 ${templateImport}
 
 function App() {
@@ -161,7 +171,11 @@ export default App
         const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
         if (await fs.pathExists(mainTsxPath)) {
           let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
-          mainContent = mainContent.replace(/import\s+['"].*index\.css['"]/g, "import './index.scss'");
+          // Replace any import of index.css with index.scss
+          mainContent = mainContent.replace(
+            /import\s+(['"])(.*\/)?index\.css\1/g, 
+            "import './index.scss'"
+          );
           await fs.writeFile(mainTsxPath, mainContent);
         }
       } else if (cssFramework === 'css') {

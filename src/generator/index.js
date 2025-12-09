@@ -1207,27 +1207,99 @@ async function addShadcnExamples(targetPath) {
   try {
     // Add login-01 example
     console.log(chalk.blue('  Adding login-01 example...'));
-    await execa('npx', ['shadcn@latest', 'add', 'login-01', '--yes', '--overwrite'], {
+    const loginResult = await execa('npx', ['shadcn@latest', 'add', 'login-01', '--yes', '--overwrite'], {
       cwd: targetPath,
-      stdio: 'inherit'
+      stdio: 'pipe' // Capture output to check for errors
     });
+    
+    if (loginResult.exitCode !== 0) {
+      console.warn(chalk.yellow(`  Warning: login-01 command exited with code ${loginResult.exitCode}`));
+      console.warn(chalk.yellow(`  Output: ${loginResult.stdout}`));
+      if (loginResult.stderr) {
+        console.warn(chalk.yellow(`  Error: ${loginResult.stderr}`));
+      }
+    } else {
+      console.log(chalk.green('  ✅ login-01 added successfully'));
+    }
 
     // Add dashboard-01 example
     console.log(chalk.blue('  Adding dashboard-01 example...'));
-    await execa('npx', ['shadcn@latest', 'add', 'dashboard-01', '--yes', '--overwrite'], {
+    const dashboardResult = await execa('npx', ['shadcn@latest', 'add', 'dashboard-01', '--yes', '--overwrite'], {
       cwd: targetPath,
-      stdio: 'inherit'
+      stdio: 'pipe' // Capture output to check for errors
     });
+    
+    if (dashboardResult.exitCode !== 0) {
+      console.warn(chalk.yellow(`  Warning: dashboard-01 command exited with code ${dashboardResult.exitCode}`));
+      console.warn(chalk.yellow(`  Output: ${dashboardResult.stdout}`));
+      if (dashboardResult.stderr) {
+        console.warn(chalk.yellow(`  Error: ${dashboardResult.stderr}`));
+      }
+    } else {
+      console.log(chalk.green('  ✅ dashboard-01 added successfully'));
+    }
+
+    // Wait a bit for file system to sync
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Update App.tsx to use the shadcn examples
     await updateAppWithShadcnExamples(targetPath);
   } catch (error) {
-    console.warn(chalk.yellow(`Warning: Failed to add shadcn examples: ${error.message}`));
+    console.error(chalk.red(`  ❌ Error adding shadcn examples: ${error.message}`));
+    console.error(chalk.yellow('  You may need to manually run:'));
+    console.error(chalk.yellow('    npx shadcn@latest add login-01'));
+    console.error(chalk.yellow('    npx shadcn@latest add dashboard-01'));
+    throw error;
   }
+}
+
+async function findFileRecursively(dir, searchPattern) {
+  if (!(await fs.pathExists(dir))) {
+    return null;
+  }
+  
+  try {
+    const files = await fs.readdir(dir, { withFileTypes: true });
+    
+    for (const file of files) {
+      const fullPath = path.join(dir, file.name);
+      
+      if (file.isDirectory()) {
+        // Skip node_modules and other common directories
+        if (file.name === 'node_modules' || file.name === '.git' || file.name === 'dist' || file.name === 'build') {
+          continue;
+        }
+        const found = await findFileRecursively(fullPath, searchPattern);
+        if (found) return found;
+      } else {
+        // Check if filename matches the pattern
+        // searchPattern could be 'login-01.tsx' or just 'login-01'
+        const nameWithoutExt = file.name.replace(/\.(tsx|ts|jsx|js)$/, '');
+        const patternWithoutExt = searchPattern.replace(/\.(tsx|ts|jsx|js)$/, '');
+        
+        if (file.name === searchPattern || 
+            nameWithoutExt === patternWithoutExt ||
+            file.name.includes(patternWithoutExt)) {
+          // Check if it's a TypeScript/JavaScript file
+          if (file.name.endsWith('.tsx') || file.name.endsWith('.ts') || 
+              file.name.endsWith('.jsx') || file.name.endsWith('.js')) {
+            return fullPath;
+          }
+        }
+      }
+    }
+  } catch (error) {
+    // Directory might not exist or be accessible
+    return null;
+  }
+  
+  return null;
 }
 
 async function updateAppWithShadcnExamples(targetPath) {
   const appTsxPath = path.join(targetPath, 'src', 'App.tsx');
+  
+  console.log(chalk.blue('  Searching for shadcn example files...'));
   
   // Check where shadcn added the examples
   // They're typically in src/app/examples/ directory
@@ -1236,6 +1308,8 @@ async function updateAppWithShadcnExamples(targetPath) {
     path.join(targetPath, 'src', 'app', 'examples', 'login-01', 'page.tsx'),
     path.join(targetPath, 'src', 'app', 'login-01', 'login-01.tsx'),
     path.join(targetPath, 'src', 'app', 'login-01', 'page.tsx'),
+    path.join(targetPath, 'src', 'examples', 'login-01', 'login-01.tsx'),
+    path.join(targetPath, 'src', 'examples', 'login-01', 'page.tsx'),
   ];
 
   const possibleDashboardPaths = [
@@ -1243,14 +1317,18 @@ async function updateAppWithShadcnExamples(targetPath) {
     path.join(targetPath, 'src', 'app', 'examples', 'dashboard-01', 'page.tsx'),
     path.join(targetPath, 'src', 'app', 'dashboard-01', 'dashboard-01.tsx'),
     path.join(targetPath, 'src', 'app', 'dashboard-01', 'page.tsx'),
+    path.join(targetPath, 'src', 'examples', 'dashboard-01', 'dashboard-01.tsx'),
+    path.join(targetPath, 'src', 'examples', 'dashboard-01', 'page.tsx'),
   ];
 
   let loginPath = null;
   let dashboardPath = null;
 
+  // Try the common paths first
   for (const p of possibleLoginPaths) {
     if (await fs.pathExists(p)) {
       loginPath = p;
+      console.log(chalk.green(`  Found login-01 at: ${p}`));
       break;
     }
   }
@@ -1258,14 +1336,105 @@ async function updateAppWithShadcnExamples(targetPath) {
   for (const p of possibleDashboardPaths) {
     if (await fs.pathExists(p)) {
       dashboardPath = p;
+      console.log(chalk.green(`  Found dashboard-01 at: ${p}`));
       break;
     }
+  }
+
+  // If not found, search recursively in src/app and src directories
+  if (!loginPath) {
+    console.log(chalk.yellow('  Login-01 not found in common paths, searching recursively...'));
+    // Try different search patterns
+    loginPath = await findFileRecursively(path.join(targetPath, 'src'), 'login-01.tsx');
+    if (!loginPath) {
+      loginPath = await findFileRecursively(path.join(targetPath, 'src'), 'login-01');
+    }
+    if (!loginPath) {
+      // Look for any file in a login-01 directory
+      const loginDir = path.join(targetPath, 'src', 'app', 'examples', 'login-01');
+      if (await fs.pathExists(loginDir)) {
+        const files = await fs.readdir(loginDir);
+        const tsxFile = files.find(f => f.endsWith('.tsx') || f.endsWith('.ts'));
+        if (tsxFile) {
+          loginPath = path.join(loginDir, tsxFile);
+        }
+      }
+    }
+    if (loginPath) {
+      console.log(chalk.green(`  Found login-01 at: ${loginPath}`));
+    }
+  }
+
+  if (!dashboardPath) {
+    console.log(chalk.yellow('  Dashboard-01 not found in common paths, searching recursively...'));
+    // Try different search patterns
+    dashboardPath = await findFileRecursively(path.join(targetPath, 'src'), 'dashboard-01.tsx');
+    if (!dashboardPath) {
+      dashboardPath = await findFileRecursively(path.join(targetPath, 'src'), 'dashboard-01');
+    }
+    if (!dashboardPath) {
+      // Look for any file in a dashboard-01 directory
+      const dashboardDir = path.join(targetPath, 'src', 'app', 'examples', 'dashboard-01');
+      if (await fs.pathExists(dashboardDir)) {
+        const files = await fs.readdir(dashboardDir);
+        const tsxFile = files.find(f => f.endsWith('.tsx') || f.endsWith('.ts'));
+        if (tsxFile) {
+          dashboardPath = path.join(dashboardDir, tsxFile);
+        }
+      }
+    }
+    if (dashboardPath) {
+      console.log(chalk.green(`  Found dashboard-01 at: ${dashboardPath}`));
+    }
+  }
+
+  // If still not found, list what's actually in src/app/examples
+  if (!loginPath || !dashboardPath) {
+    const examplesDir = path.join(targetPath, 'src', 'app', 'examples');
+    if (await fs.pathExists(examplesDir)) {
+      console.log(chalk.yellow('  Checking src/app/examples directory...'));
+      try {
+        const examples = await fs.readdir(examplesDir, { withFileTypes: true });
+        console.log(chalk.blue('  Found in examples directory:'));
+        for (const item of examples) {
+          if (item.isDirectory()) {
+            console.log(chalk.blue(`    - ${item.name}/`));
+            const subDir = path.join(examplesDir, item.name);
+            const subFiles = await fs.readdir(subDir);
+            subFiles.forEach(file => {
+              console.log(chalk.blue(`      - ${file}`));
+            });
+          }
+        }
+      } catch (error) {
+        console.log(chalk.yellow(`  Could not read examples directory: ${error.message}`));
+      }
+    }
+  }
+
+  if (!loginPath) {
+    console.error(chalk.red('  ❌ Error: Could not find login-01 component'));
+    console.error(chalk.yellow('  Please check if the shadcn CLI successfully added login-01'));
+    console.error(chalk.yellow('  Expected locations:'));
+    console.error(chalk.yellow('    - src/app/examples/login-01/login-01.tsx'));
+    console.error(chalk.yellow('    - src/app/examples/login-01/page.tsx'));
+  }
+
+  if (!dashboardPath) {
+    console.error(chalk.red('  ❌ Error: Could not find dashboard-01 component'));
+    console.error(chalk.yellow('  Please check if the shadcn CLI successfully added dashboard-01'));
+    console.error(chalk.yellow('  Expected locations:'));
+    console.error(chalk.yellow('    - src/app/examples/dashboard-01/dashboard-01.tsx'));
+    console.error(chalk.yellow('    - src/app/examples/dashboard-01/page.tsx'));
   }
 
   if (loginPath && dashboardPath) {
     // Get relative paths from src/App.tsx
     const loginRelative = path.relative(path.join(targetPath, 'src'), loginPath).replace(/\\/g, '/').replace(/\.tsx?$/, '');
     const dashboardRelative = path.relative(path.join(targetPath, 'src'), dashboardPath).replace(/\\/g, '/').replace(/\.tsx?$/, '');
+
+    console.log(chalk.green(`  Using login component from: ${loginRelative}`));
+    console.log(chalk.green(`  Using dashboard component from: ${dashboardRelative}`));
 
     // Read the example files to get the component names
     const loginContent = await fs.readFile(loginPath, 'utf-8');
@@ -1420,15 +1589,55 @@ export default App
 `;
 
     await fs.writeFile(appTsxPath, appContent);
+    console.log(chalk.green('  ✅ App.tsx updated successfully with login-01 and dashboard-01'));
   } else {
-    // Fallback: create a simple App.tsx that will work
-    console.warn(chalk.yellow('Could not find shadcn example files. You may need to manually update App.tsx.'));
+    // Fallback: create a simple App.tsx with helpful error message
+    console.error(chalk.red('\n  ❌ Error: Could not find both login-01 and dashboard-01 components'));
+    console.error(chalk.yellow('  The shadcn CLI may have installed them in a different location.'));
+    console.error(chalk.yellow('  Please check:'));
+    console.error(chalk.yellow('    1. src/app/examples/login-01/'));
+    console.error(chalk.yellow('    2. src/app/examples/dashboard-01/'));
+    console.error(chalk.yellow('    3. Or run manually: npx shadcn@latest add login-01 dashboard-01\n'));
+    
+    // Try to list what's actually in the examples directory
+    const examplesDir = path.join(targetPath, 'src', 'app', 'examples');
+    if (await fs.pathExists(examplesDir)) {
+      try {
+        const examples = await fs.readdir(examplesDir, { withFileTypes: true });
+        console.log(chalk.blue('  Found in src/app/examples/:'));
+        for (const item of examples) {
+          if (item.isDirectory()) {
+            const subDir = path.join(examplesDir, item.name);
+            const subFiles = await fs.readdir(subDir);
+            console.log(chalk.blue(`    ${item.name}/`));
+            subFiles.forEach(file => {
+              console.log(chalk.blue(`      - ${file}`));
+            });
+          }
+        }
+      } catch (error) {
+        // Ignore errors
+      }
+    }
+    
     const appContent = `import { Routes, Route, Navigate } from 'react-router-dom'
+
+// TODO: Update imports to point to your login-01 and dashboard-01 components
+// They should be in src/app/examples/login-01/ and src/app/examples/dashboard-01/
+// Example:
+// import Login01 from './app/examples/login-01/login-01'
+// import Dashboard01 from './app/examples/dashboard-01/dashboard-01'
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<div>Please check src/app/examples/ for login-01 and dashboard-01</div>} />
+      <Route path="/" element={
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <h1>Setup Required</h1>
+          <p>Please check src/app/examples/ for login-01 and dashboard-01 components</p>
+          <p>Then update this App.tsx file to import and use them.</p>
+        </div>
+      } />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

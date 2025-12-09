@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export async function generateProject(targetPath, answers) {
-  const { template, tailwind, componentLibrary } = answers;
+  const { template, cssFramework, componentLibrary } = answers;
 
   try {
     // Get paths
@@ -96,8 +96,17 @@ export default App
       }
     }
 
-    // Handle Tailwind CSS
-    if (!tailwind) {
+    // Handle CSS Framework
+    const packageJsonPath = path.join(targetPath, 'package.json');
+    let packageJson = {};
+    if (await fs.pathExists(packageJsonPath)) {
+      packageJson = await fs.readJson(packageJsonPath);
+    }
+
+    if (cssFramework === 'tailwind') {
+      // Keep Tailwind - no changes needed
+      console.log(chalk.blue('✅ Tailwind CSS will be configured'));
+    } else {
       // Remove Tailwind files if not selected
       const tailwindFiles = [
         'tailwind.config.js',
@@ -109,20 +118,74 @@ export default App
           await fs.remove(filePath);
         }
       }
-      
-      // Remove Tailwind imports from CSS
-      const cssPath = path.join(targetSrcPath, 'index.css');
-      if (await fs.pathExists(cssPath)) {
-        await fs.writeFile(cssPath, '');
-      }
 
       // Remove Tailwind from package.json
-      const packageJsonPath = path.join(targetPath, 'package.json');
+      delete packageJson.devDependencies?.tailwindcss;
+      delete packageJson.devDependencies?.autoprefixer;
+      delete packageJson.devDependencies?.postcss;
+
+      if (cssFramework === 'sass') {
+        // Handle SASS
+        console.log(chalk.blue('✅ Setting up SASS...'));
+        
+        // Add sass dependency
+        if (!packageJson.devDependencies) {
+          packageJson.devDependencies = {};
+        }
+        packageJson.devDependencies['sass'] = '^1.69.0';
+
+        // Rename index.css to index.scss
+        const cssPath = path.join(targetSrcPath, 'index.css');
+        const scssPath = path.join(targetSrcPath, 'index.scss');
+        
+        if (await fs.pathExists(cssPath)) {
+          // Read existing CSS content (remove Tailwind directives if present)
+          let cssContent = await fs.readFile(cssPath, 'utf-8');
+          cssContent = cssContent.replace(/@tailwind\s+[^;]+;/g, '');
+          cssContent = cssContent.trim();
+          
+          // If empty, add basic SASS structure
+          if (!cssContent) {
+            cssContent = `// Main stylesheet\n\n* {\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n}\n\nbody {\n  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',\n    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',\n    sans-serif;\n  -webkit-font-smoothing: antialiased;\n  -moz-osx-font-smoothing: grayscale;\n}\n`;
+          }
+          
+          await fs.writeFile(scssPath, cssContent);
+          await fs.remove(cssPath);
+        } else {
+          // Create new index.scss
+          const defaultScss = `// Main stylesheet\n\n* {\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n}\n\nbody {\n  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',\n    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',\n    sans-serif;\n  -webkit-font-smoothing: antialiased;\n  -moz-osx-font-smoothing: grayscale;\n}\n`;
+          await fs.writeFile(scssPath, defaultScss);
+        }
+
+        // Update main.tsx to import .scss instead of .css
+        const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
+        if (await fs.pathExists(mainTsxPath)) {
+          let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+          mainContent = mainContent.replace(/import\s+['"].*index\.css['"]/g, "import './index.scss'");
+          await fs.writeFile(mainTsxPath, mainContent);
+        }
+      } else if (cssFramework === 'css') {
+        // Handle regular CSS
+        console.log(chalk.blue('✅ Using regular CSS...'));
+        
+        // Remove Tailwind imports from CSS
+        const cssPath = path.join(targetSrcPath, 'index.css');
+        if (await fs.pathExists(cssPath)) {
+          let cssContent = await fs.readFile(cssPath, 'utf-8');
+          cssContent = cssContent.replace(/@tailwind\s+[^;]+;/g, '');
+          cssContent = cssContent.trim();
+          
+          // If empty, add basic CSS
+          if (!cssContent) {
+            cssContent = `* {\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n}\n\nbody {\n  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',\n    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',\n    sans-serif;\n  -webkit-font-smoothing: antialiased;\n  -moz-osx-font-smoothing: grayscale;\n}\n`;
+          }
+          
+          await fs.writeFile(cssPath, cssContent);
+        }
+      }
+
+      // Save updated package.json
       if (await fs.pathExists(packageJsonPath)) {
-        const packageJson = await fs.readJson(packageJsonPath);
-        delete packageJson.devDependencies?.tailwindcss;
-        delete packageJson.devDependencies?.autoprefixer;
-        delete packageJson.devDependencies?.postcss;
         await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
       }
     }
@@ -133,9 +196,10 @@ export default App
     }
 
     // Update package.json with component library dependencies if needed
-    const packageJsonPath = path.join(targetPath, 'package.json');
     if (await fs.pathExists(packageJsonPath)) {
-      const packageJson = await fs.readJson(packageJsonPath);
+      if (!packageJson.dependencies) {
+        packageJson.dependencies = {};
+      }
       
       if (componentLibrary === 'mui') {
         packageJson.dependencies['@mui/material'] = '^5.15.0';

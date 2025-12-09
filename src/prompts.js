@@ -13,10 +13,15 @@ export async function askQuestions() {
       ]
     },
     {
-      type: 'confirm',
-      name: 'tailwind',
-      message: 'Add Tailwind CSS?',
-      default: true
+      type: 'list',
+      name: 'cssFramework',
+      message: 'Select CSS framework:',
+      choices: [
+        { name: 'CSS', value: 'css' },
+        { name: 'SASS', value: 'sass' },
+        { name: 'Tailwind', value: 'tailwind' }
+      ],
+      default: 'tailwind'
     },
     {
       type: 'list',

@@ -82,11 +82,7 @@ export async function generateProject(targetPath, answers) {
 ${templateImport}
 
 function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<${templateName} />} />
-    </Routes>
-  )
+  return <${templateName} />
 }
 
 export default App
@@ -150,6 +146,7 @@ export default App
         // If empty or only had Tailwind, add basic SASS structure
         if (!scssContent || scssContent.length === 0) {
           scssContent = `// Main stylesheet
+// This file will be compiled to CSS by Vite
 
 * {
   margin: 0;
@@ -167,13 +164,35 @@ body {
 `;
         }
         
+        // Ensure SCSS content is not just whitespace
+        if (scssContent.trim().length === 0) {
+          scssContent = `// Main stylesheet
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+`;
+        }
+        
         // Write SCSS file
         await fs.writeFile(scssPath, scssContent);
-        console.log(chalk.green(`✅ Created ${path.basename(scssPath)}`));
+        
+        // Verify SCSS file was created
+        if (await fs.pathExists(scssPath)) {
+          console.log(chalk.green(`✅ Created ${path.basename(scssPath)}`));
+        } else {
+          console.log(chalk.red(`❌ Failed to create ${path.basename(scssPath)}`));
+        }
         
         // Remove CSS file if it exists
         if (await fs.pathExists(cssPath)) {
           await fs.remove(cssPath);
+          console.log(chalk.blue(`🗑️  Removed old ${path.basename(cssPath)}`));
         }
 
         // Update main.tsx to import .scss instead of .css
@@ -182,26 +201,45 @@ body {
           let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
           
           // Replace any import of index.css with index.scss
-          // Use a single comprehensive regex that handles all cases
-          mainContent = mainContent.replace(
-            /import\s+(['"])([^'"]*\/)?index\.css\1/g,
-            "import './index.scss'"
-          );
+          // Handle various import patterns
+          if (mainContent.includes("import './index.css'")) {
+            mainContent = mainContent.replace("import './index.css'", "import './index.scss'");
+          } else if (mainContent.includes('import "./index.css"')) {
+            mainContent = mainContent.replace('import "./index.css"', 'import "./index.scss"');
+          } else if (mainContent.includes("import '../index.css'")) {
+            mainContent = mainContent.replace("import '../index.css'", "import './index.scss'");
+          } else {
+            // Fallback: use regex for any other pattern
+            mainContent = mainContent.replace(
+              /import\s+(['"])([^'"]*\/)?index\.css\1/g,
+              "import './index.scss'"
+            );
+          }
           
-          // Also handle any remaining references (fallback)
+          // Final fallback: simple string replace
           if (mainContent.includes('index.css') && !mainContent.includes('index.scss')) {
             mainContent = mainContent.replace(/index\.css/g, 'index.scss');
           }
           
           await fs.writeFile(mainTsxPath, mainContent);
           
-          // Verify the replacement worked
+          // Verify both the file and import exist
+          const scssExists = await fs.pathExists(scssPath);
           const updatedContent = await fs.readFile(mainTsxPath, 'utf-8');
-          if (updatedContent.includes('index.scss')) {
-            console.log(chalk.green('✅ Updated main.tsx to import index.scss'));
-          } else if (updatedContent.includes('index.css')) {
-            console.log(chalk.yellow('⚠️  Warning: Could not update import in main.tsx. Please manually change index.css to index.scss'));
+          const hasScssImport = updatedContent.includes('index.scss');
+          
+          if (scssExists && hasScssImport) {
+            console.log(chalk.green('✅ SCSS setup complete: file created and import updated'));
+          } else {
+            if (!scssExists) {
+              console.log(chalk.red('❌ Error: SCSS file was not created'));
+            }
+            if (!hasScssImport) {
+              console.log(chalk.yellow('⚠️  Warning: Import not updated. Please manually change index.css to index.scss in main.tsx'));
+            }
           }
+        } else {
+          console.log(chalk.yellow('⚠️  Warning: main.tsx not found, cannot update SCSS import'));
         }
       } else if (cssFramework === 'css') {
         // Handle regular CSS
@@ -223,9 +261,12 @@ body {
         }
       }
 
-      // Save updated package.json
+      // Save updated package.json (with sass dependency if SASS was selected)
       if (await fs.pathExists(packageJsonPath)) {
         await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
+        if (cssFramework === 'sass') {
+          console.log(chalk.green('✅ Added sass to package.json'));
+        }
       }
     }
 
@@ -251,10 +292,35 @@ body {
         packageJson.dependencies['antd'] = '^5.12.0';
       }
       
+      // Save package.json with all dependencies (CSS framework + component library)
       await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
+    }
+    
+    // Final verification before npm install
+    if (cssFramework === 'sass') {
+      const finalPackageJson = await fs.readJson(packageJsonPath);
+      const scssFileExists = await fs.pathExists(path.join(targetSrcPath, 'index.scss'));
+      const mainTsxContent = await fs.readFile(path.join(targetSrcPath, 'main.tsx'), 'utf-8');
+      const hasScssImport = mainTsxContent.includes('index.scss');
+      
+      if (finalPackageJson.devDependencies?.sass && scssFileExists && hasScssImport) {
+        console.log(chalk.green('✅ SCSS setup verified: sass dependency, SCSS file, and import are all configured'));
+      } else {
+        console.log(chalk.yellow('⚠️  SCSS setup verification:'));
+        if (!finalPackageJson.devDependencies?.sass) {
+          console.log(chalk.yellow('   - sass dependency missing in package.json'));
+        }
+        if (!scssFileExists) {
+          console.log(chalk.yellow('   - index.scss file missing'));
+        }
+        if (!hasScssImport) {
+          console.log(chalk.yellow('   - SCSS import not found in main.tsx'));
+        }
+      }
     }
 
     console.log(chalk.blue('📦 Installing dependencies...'));
+    console.log(chalk.blue('   This will install all dependencies including sass (if selected)...'));
     
     // Install dependencies
     await execa('npm', ['install'], {
@@ -266,12 +332,50 @@ body {
     
     // Verify SCSS setup if SASS was selected
     if (cssFramework === 'sass') {
+      console.log(chalk.blue('\n🔍 Verifying SCSS setup...'));
+      
+      // Check if sass was installed
+      const nodeModulesSass = path.join(targetPath, 'node_modules', 'sass');
+      const sassInstalled = await fs.pathExists(nodeModulesSass);
+      
+      // Check package.json
       const finalPackageJson = await fs.readJson(packageJsonPath);
-      if (finalPackageJson.devDependencies?.sass) {
-        console.log(chalk.green('✅ SASS is configured and ready to use'));
-        console.log(chalk.blue('💡 Vite will automatically compile your SCSS files when you run npm run dev'));
+      const hasSassInPackage = !!finalPackageJson.devDependencies?.sass;
+      
+      // Check SCSS file
+      const scssFileExists = await fs.pathExists(path.join(targetSrcPath, 'index.scss'));
+      
+      // Check import
+      const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
+      let hasScssImport = false;
+      if (await fs.pathExists(mainTsxPath)) {
+        const mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+        hasScssImport = mainContent.includes('index.scss');
+      }
+      
+      if (sassInstalled && hasSassInPackage && scssFileExists && hasScssImport) {
+        console.log(chalk.green('✅ SCSS is fully configured and ready to use!'));
+        console.log(chalk.green('   ✓ sass package installed'));
+        console.log(chalk.green('   ✓ index.scss file exists'));
+        console.log(chalk.green('   ✓ main.tsx imports index.scss'));
+        console.log(chalk.blue('\n💡 Vite will automatically compile your SCSS files when you run: npm run dev'));
+        console.log(chalk.blue('   Your SCSS will be compiled to CSS automatically - no manual steps needed!'));
       } else {
-        console.log(chalk.yellow('⚠️  Warning: SASS dependency may not have been installed correctly'));
+        console.log(chalk.yellow('⚠️  SCSS setup verification issues:'));
+        if (!sassInstalled) {
+          console.log(chalk.red('   ✗ sass package not found in node_modules'));
+          console.log(chalk.yellow('   → Try running: npm install sass --save-dev'));
+        }
+        if (!hasSassInPackage) {
+          console.log(chalk.red('   ✗ sass missing from package.json'));
+        }
+        if (!scssFileExists) {
+          console.log(chalk.red('   ✗ index.scss file not found'));
+        }
+        if (!hasScssImport) {
+          console.log(chalk.red('   ✗ SCSS import not found in main.tsx'));
+          console.log(chalk.yellow('   → Update main.tsx to import "./index.scss" instead of "./index.css"'));
+        }
       }
     }
 

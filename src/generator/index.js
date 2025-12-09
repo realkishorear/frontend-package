@@ -63,6 +63,12 @@ export async function generateProject(targetPath, answers) {
   // Install dependencies
   console.log(chalk.blue('📦 Installing dependencies...'));
   await installDependencies(targetPath);
+
+  // Add shadcn examples for dashboard + shadcn combination
+  if (template === 'dashboard' && componentLibrary === 'shadcn') {
+    console.log(chalk.blue('🎨 Adding shadcn/ui examples...'));
+    await addShadcnExamples(targetPath);
+  }
 }
 
 async function copyBaseFiles(basePath, targetPath) {
@@ -83,7 +89,10 @@ async function copyBaseFiles(basePath, targetPath) {
 }
 
 async function copyTemplateFiles(templatePath, targetPath, template, answers) {
-  // Copy all template files except App.tsx (we'll handle that separately)
+  // Check if we're using shadcn examples (dashboard + shadcn)
+  const useShadcnExamples = template === 'dashboard' && answers.componentLibrary === 'shadcn';
+  
+  // Copy all template files except App.tsx and Dashboard.tsx (we'll handle those separately)
   const files = await fs.readdir(templatePath);
   
   for (const file of files) {
@@ -91,6 +100,14 @@ async function copyTemplateFiles(templatePath, targetPath, template, answers) {
     const stat = await fs.stat(srcPath);
     
     if (stat.isDirectory()) {
+      // Skip copying pages directory if using shadcn examples (they'll be added by shadcn CLI)
+      if (useShadcnExamples && file === 'pages') {
+        continue;
+      }
+      // Skip copying components directory if using shadcn examples (they'll be added by shadcn CLI)
+      if (useShadcnExamples && file === 'components') {
+        continue;
+      }
       // Copy directories (pages, components, layout, etc.) to src/
       await fs.copy(srcPath, path.join(targetPath, 'src', file));
     } else if (file !== 'App.tsx' && file !== 'Dashboard.tsx' && file !== 'Landing.tsx') {
@@ -100,6 +117,26 @@ async function copyTemplateFiles(templatePath, targetPath, template, answers) {
   }
   
   // Handle template-specific App.tsx
+  // Skip if using shadcn examples (App.tsx will be created after shadcn CLI runs)
+  if (useShadcnExamples) {
+    // Create a placeholder App.tsx that will be updated after shadcn examples are added
+    const appTsxPath = path.join(targetPath, 'src', 'App.tsx');
+    const appContent = `import { Routes, Route } from 'react-router-dom'
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<div>Loading...</div>} />
+    </Routes>
+  )
+}
+
+export default App
+`;
+    await fs.writeFile(appTsxPath, appContent);
+    return; // Exit early, App.tsx will be updated by updateAppWithShadcnExamples
+  }
+  
   const templateAppPath = path.join(templatePath, 
     template === 'dashboard' ? 'Dashboard.tsx' : 
     template === 'landing' ? 'Landing.tsx' : 
@@ -117,40 +154,8 @@ async function copyTemplateFiles(templatePath, targetPath, template, answers) {
       const dashboardPath = path.join(targetPath, 'src', 'Dashboard.tsx');
       await fs.writeFile(dashboardPath, templateAppContent);
       
-      // Check if we need auth (dashboard + shadcn)
-      const needsAuth = template === 'dashboard' && answers.componentLibrary === 'shadcn';
-      
-      if (needsAuth) {
-        // Copy Auth page if it exists
-        const authTemplatePath = path.join(templatePath, 'pages', 'Auth.tsx');
-        if (await fs.pathExists(authTemplatePath)) {
-          const authContent = await fs.readFile(authTemplatePath, 'utf-8');
-          const authPath = path.join(targetPath, 'src', 'pages', 'Auth.tsx');
-          await fs.ensureDir(path.join(targetPath, 'src', 'pages'));
-          await fs.writeFile(authPath, authContent);
-        }
-        
-        // Create App.tsx with auth routing
-        const appContent = `import { Routes, Route, Navigate } from 'react-router-dom'
-import Dashboard from './Dashboard'
-import { Auth } from './pages/Auth'
-
-function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<Auth />} />
-      <Route path="/dashboard/*" element={<Dashboard />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  )
-}
-
-export default App
-`;
-        await fs.writeFile(appTsxPath, appContent);
-      } else {
-        // Create App.tsx that uses Dashboard without auth
-        const appContent = `import Dashboard from './Dashboard'
+      // Create App.tsx that uses Dashboard without auth
+      const appContent = `import Dashboard from './Dashboard'
 
 function App() {
   return <Dashboard />
@@ -158,8 +163,7 @@ function App() {
 
 export default App
 `;
-        await fs.writeFile(appTsxPath, appContent);
-      }
+      await fs.writeFile(appTsxPath, appContent);
     } else if (template === 'landing') {
       // Landing template uses Landing.tsx as main component
       // Copy Landing.tsx to src/components/ and create App.tsx with routes
@@ -1196,6 +1200,229 @@ async function installDependencies(targetPath) {
       cwd: targetPath,
       stdio: 'inherit'
     });
+  }
+}
+
+async function addShadcnExamples(targetPath) {
+  try {
+    // Add login-01 example
+    console.log(chalk.blue('  Adding login-01 example...'));
+    await execa('npx', ['shadcn@latest', 'add', 'login-01', '--yes', '--overwrite'], {
+      cwd: targetPath,
+      stdio: 'inherit'
+    });
+
+    // Add dashboard-01 example
+    console.log(chalk.blue('  Adding dashboard-01 example...'));
+    await execa('npx', ['shadcn@latest', 'add', 'dashboard-01', '--yes', '--overwrite'], {
+      cwd: targetPath,
+      stdio: 'inherit'
+    });
+
+    // Update App.tsx to use the shadcn examples
+    await updateAppWithShadcnExamples(targetPath);
+  } catch (error) {
+    console.warn(chalk.yellow(`Warning: Failed to add shadcn examples: ${error.message}`));
+  }
+}
+
+async function updateAppWithShadcnExamples(targetPath) {
+  const appTsxPath = path.join(targetPath, 'src', 'App.tsx');
+  
+  // Check where shadcn added the examples
+  // They're typically in src/app/examples/ directory
+  const possibleLoginPaths = [
+    path.join(targetPath, 'src', 'app', 'examples', 'login-01', 'login-01.tsx'),
+    path.join(targetPath, 'src', 'app', 'examples', 'login-01', 'page.tsx'),
+    path.join(targetPath, 'src', 'app', 'login-01', 'login-01.tsx'),
+    path.join(targetPath, 'src', 'app', 'login-01', 'page.tsx'),
+  ];
+
+  const possibleDashboardPaths = [
+    path.join(targetPath, 'src', 'app', 'examples', 'dashboard-01', 'dashboard-01.tsx'),
+    path.join(targetPath, 'src', 'app', 'examples', 'dashboard-01', 'page.tsx'),
+    path.join(targetPath, 'src', 'app', 'dashboard-01', 'dashboard-01.tsx'),
+    path.join(targetPath, 'src', 'app', 'dashboard-01', 'page.tsx'),
+  ];
+
+  let loginPath = null;
+  let dashboardPath = null;
+
+  for (const p of possibleLoginPaths) {
+    if (await fs.pathExists(p)) {
+      loginPath = p;
+      break;
+    }
+  }
+
+  for (const p of possibleDashboardPaths) {
+    if (await fs.pathExists(p)) {
+      dashboardPath = p;
+      break;
+    }
+  }
+
+  if (loginPath && dashboardPath) {
+    // Get relative paths from src/App.tsx
+    const loginRelative = path.relative(path.join(targetPath, 'src'), loginPath).replace(/\\/g, '/').replace(/\.tsx?$/, '');
+    const dashboardRelative = path.relative(path.join(targetPath, 'src'), dashboardPath).replace(/\\/g, '/').replace(/\.tsx?$/, '');
+
+    // Read the example files to get the component names
+    const loginContent = await fs.readFile(loginPath, 'utf-8');
+    const dashboardContent = await fs.readFile(dashboardPath, 'utf-8');
+
+    // Extract component names (usually default export or named export)
+    let loginComponent = 'Login01';
+    let dashboardComponent = 'Dashboard01';
+
+    // Try to find default export name
+    const loginDefaultMatch = loginContent.match(/export\s+default\s+(?:function\s+)?(\w+)/);
+    if (loginDefaultMatch) {
+      loginComponent = loginDefaultMatch[1];
+    } else {
+      // Try named export
+      const loginNamedMatch = loginContent.match(/export\s+(?:function|const)\s+(\w+)/);
+      if (loginNamedMatch) {
+        loginComponent = loginNamedMatch[1];
+      }
+    }
+
+    const dashboardDefaultMatch = dashboardContent.match(/export\s+default\s+(?:function\s+)?(\w+)/);
+    if (dashboardDefaultMatch) {
+      dashboardComponent = dashboardDefaultMatch[1];
+    } else {
+      // Try named export
+      const dashboardNamedMatch = dashboardContent.match(/export\s+(?:function|const)\s+(\w+)/);
+      if (dashboardNamedMatch) {
+        dashboardComponent = dashboardNamedMatch[1];
+      }
+    }
+
+    // Check if login component accepts onLogin prop or if we need to wrap it
+    const hasOnLoginProp = loginContent.includes('onLogin') || loginContent.includes('onSubmit');
+    const hasNavigate = loginContent.includes('useNavigate');
+    
+    // Create App.tsx with routing
+    let appContent;
+    if (hasOnLoginProp) {
+      // Component accepts onLogin/onSubmit prop
+      appContent = `import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import ${loginComponent} from './${loginRelative}'
+import ${dashboardComponent} from './${dashboardRelative}'
+
+// Wrap login to add navigation
+function Login() {
+  const navigate = useNavigate()
+  
+  const handleLogin = () => {
+    // Accept any username/password and navigate to dashboard
+    navigate('/dashboard')
+  }
+  
+  return <${loginComponent} onLogin={handleLogin} onSubmit={handleLogin} />
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Login />} />
+      <Route path="/dashboard" element={<${dashboardComponent} />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
+
+export default App
+`;
+    } else {
+      // Wrap login to intercept form submissions
+      appContent = `import { useEffect, useRef } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import ${loginComponent} from './${loginRelative}'
+import ${dashboardComponent} from './${dashboardRelative}'
+
+// Wrap login to add navigation
+function Login() {
+  const navigate = useNavigate()
+  const containerRef = useRef<HTMLDivElement>(null)
+  
+  useEffect(() => {
+    // Intercept form submissions to navigate to dashboard
+    // Accept any username/password
+    const container = containerRef.current
+    if (!container) return
+    
+    const handleSubmit = (e: Event) => {
+      e.preventDefault()
+      e.stopPropagation()
+      navigate('/dashboard')
+      return false
+    }
+    
+    // Find all forms and intercept their submit events
+    const forms = container.querySelectorAll('form')
+    forms.forEach(form => {
+      form.addEventListener('submit', handleSubmit, true)
+    })
+    
+    // Also intercept button clicks that might trigger navigation
+    const buttons = container.querySelectorAll('button[type="submit"]')
+    buttons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        const form = button.closest('form')
+        if (form) {
+          e.preventDefault()
+          navigate('/dashboard')
+        }
+      }, true)
+    })
+    
+    return () => {
+      forms.forEach(form => {
+        form.removeEventListener('submit', handleSubmit, true)
+      })
+    }
+  }, [navigate])
+  
+  return (
+    <div ref={containerRef}>
+      <${loginComponent} />
+    </div>
+  )
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Login />} />
+      <Route path="/dashboard" element={<${dashboardComponent} />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
+
+export default App
+`;
+    }
+
+    await fs.writeFile(appTsxPath, appContent);
+  } else {
+    // Fallback: create a simple App.tsx that will work
+    console.warn(chalk.yellow('Could not find shadcn example files. You may need to manually update App.tsx.'));
+    const appContent = `import { Routes, Route, Navigate } from 'react-router-dom'
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<div>Please check src/app/examples/ for login-01 and dashboard-01</div>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
+
+export default App
+`;
+    await fs.writeFile(appTsxPath, appContent);
   }
 }
 

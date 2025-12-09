@@ -21,6 +21,11 @@ async function readJsonc(filePath) {
 export async function generateProject(targetPath, answers) {
   const { template, tailwind, componentLibrary } = answers;
 
+  // Validate shadcn requires Tailwind
+  if (componentLibrary === 'shadcn' && !tailwind) {
+    throw new Error('shadcn/ui requires Tailwind CSS. Please select Tailwind CSS when using shadcn/ui.');
+  }
+
   // Get template path
   const templatePath = path.join(__dirname, 'templates', template);
 
@@ -223,6 +228,9 @@ async function setupComponentLibrary(targetPath, library, hasTailwind) {
       packageJson.dependencies['@mui/material'] = '^5.14.20';
       packageJson.dependencies['@emotion/react'] = '^11.11.1';
       packageJson.dependencies['@emotion/styled'] = '^11.11.0';
+      
+      // Setup Material UI
+      await setupMaterialUI(targetPath);
       break;
 
     case 'antd':
@@ -231,7 +239,7 @@ async function setupComponentLibrary(targetPath, library, hasTailwind) {
       break;
 
     case 'shadcn':
-      // shadcn/ui requires special setup
+      // shadcn/ui requires Tailwind (validated earlier)
       packageJson.dependencies = packageJson.dependencies || {};
       packageJson.dependencies['class-variance-authority'] = '^0.7.0';
       packageJson.dependencies['clsx'] = '^2.0.0';
@@ -244,6 +252,47 @@ async function setupComponentLibrary(targetPath, library, hasTailwind) {
   }
 
   await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
+}
+
+async function setupMaterialUI(targetPath) {
+  // Update main.tsx to include Material UI ThemeProvider and CssBaseline
+  const mainTsxPath = path.join(targetPath, 'src', 'main.tsx');
+  if (await fs.pathExists(mainTsxPath)) {
+    let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+    
+    // Check if Material UI is already set up
+    if (!mainContent.includes('@mui/material')) {
+      // Add Material UI import
+      const muiImport = "import { ThemeProvider, createTheme, CssBaseline } from '@mui/material'\n";
+      
+      // Find where to insert the import (after the last import statement)
+      const importRegex = /(import .+ from .+\n)+/;
+      const importsMatch = mainContent.match(importRegex);
+      if (importsMatch) {
+        mainContent = mainContent.replace(importRegex, importsMatch[0] + muiImport);
+      }
+      
+      // Add theme creation
+      const themeCode = "\nconst theme = createTheme({\n  palette: {\n    mode: 'light',\n  },\n})\n\n";
+      mainContent = mainContent.replace(
+        /ReactDOM\.createRoot/,
+        themeCode + 'ReactDOM.createRoot'
+      );
+      
+      // Wrap BrowserRouter with ThemeProvider and add CssBaseline
+      mainContent = mainContent.replace(
+        /<React\.StrictMode>\s*<BrowserRouter>/,
+        '<React.StrictMode>\n    <ThemeProvider theme={theme}>\n      <CssBaseline />\n      <BrowserRouter>'
+      );
+      
+      mainContent = mainContent.replace(
+        /<\/BrowserRouter>\s*<\/React\.StrictMode>/,
+        '</BrowserRouter>\n    </ThemeProvider>\n  </React.StrictMode>'
+      );
+      
+      await fs.writeFile(mainTsxPath, mainContent);
+    }
+  }
 }
 
 async function setupShadcn(targetPath, hasTailwind) {

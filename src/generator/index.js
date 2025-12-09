@@ -32,14 +32,21 @@ function convertTsToJs(content) {
   // Match generics like Array<string>, React.FC<Props>, useState<string>()
   // JSX typically has attributes (key="value"), quotes, or is self-closing (/>), generics don't
   // Only match simple generics (no quotes, no /, no = which indicate JSX)
-  jsContent = jsContent.replace(/(\w+)\s*<([^>/="']+)>(?=\s*[\(\[\{\.\s,;=]|$)/g, '$1');
+  // Be more careful - only match after identifiers/keywords, not in object literals
+  jsContent = jsContent.replace(/(\b\w+)\s*<([^>/="']+)>(?=\s*[\(\[\{\.\s,;=]|$)/g, '$1');
+  
+  // Remove array type annotations like : Type[] or : Array<Type>
+  jsContent = jsContent.replace(/:\s*[a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]*\[\]\s*=/g, ' =');
+  jsContent = jsContent.replace(/:\s*Array\s*<[^>]+>\s*=/g, ' =');
   
   // Remove type annotations from function parameters
   // Match : type (including unions like string | boolean) but preserve default values
   // Handle union types: string | boolean | number, etc.
   // First handle parameters with default values (must come before the general case)
-  jsContent = jsContent.replace(/:\s*([a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]*|string|number|boolean|void|any|unknown|never|undefined|null)(\s*\|\s*([a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]*|string|number|boolean|void|any|unknown|never|undefined|null))+\s*=\s*/g, ' = ');
-  jsContent = jsContent.replace(/:\s*([a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]*|string|number|boolean|void|any|unknown|never|undefined|null)\s*=\s*/g, ' = ');
+  jsContent = jsContent.replace(/:\s*(string|number|boolean|void|any|unknown|never|undefined|null)(\s*\|\s*(string|number|boolean|void|any|unknown|never|undefined|null))+\s*=\s*/g, ' = ');
+  jsContent = jsContent.replace(/:\s*([a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]+)(\s*\|\s*([a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]+|string|number|boolean|void|any|unknown|never|undefined|null))+\s*=\s*/g, ' = ');
+  jsContent = jsContent.replace(/:\s*(string|number|boolean|void|any|unknown|never|undefined|null)\s*=\s*/g, ' = ');
+  jsContent = jsContent.replace(/:\s*[a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]+\s*=\s*/g, ' = ');
   
   // Then remove remaining type annotations (without default values)
   // Handle union types first (more specific pattern)
@@ -64,8 +71,10 @@ function convertTsToJs(content) {
   // Remove React type helpers
   jsContent = jsContent.replace(/React\.(ReactNode|FC|Component|ComponentType|PropsWithChildren)/g, '');
   
-  // Remove type assertions (as Type)
-  jsContent = jsContent.replace(/as\s+[A-Z][a-zA-Z0-9<>\[\]|&\s,{}]*/g, '');
+  // Remove type assertions (as Type) - handle complex types like "as keyof typeof prev"
+  // Match "as" followed by type, but exclude ] from the type pattern (it's a bracket, not part of type)
+  // Type assertions: as string, as keyof typeof X, as React.Component, etc.
+  jsContent = jsContent.replace(/\s+as\s+(?:keyof|typeof|readonly\s+)?[a-zA-Z_$][a-zA-Z0-9<>\[|&\s,{}\._$]*(?:\s+(?:keyof|typeof)\s+[a-zA-Z_$][a-zA-Z0-9_$]*)*(?=\s*[\]\)\}\.,;]|\s|$)/g, '');
   
   // Remove extends clauses with types
   jsContent = jsContent.replace(/extends\s+React\.\w+<[^>]+>/g, '');

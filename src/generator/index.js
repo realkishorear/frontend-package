@@ -18,29 +18,57 @@ async function readJsonc(filePath) {
 
 // Convert TypeScript code to JavaScript
 function convertTsToJs(content) {
-  let jsContent = content
+  let jsContent = content;
+  
+  // Remove interface declarations
+  jsContent = jsContent
     .replace(/export\s+interface\s+\w+[^{]*\{[^}]*\}/g, '')
-    .replace(/interface\s+\w+[^{]*\{[^}]*\}/g, '')
-    .replace(/:\s*[A-Z][a-zA-Z0-9<>\[\]|&\s,{}]*(\s*=\s*[^,)]+)?/g, (match) => {
-      const defaultMatch = match.match(/=\s*.+/);
-      return defaultMatch ? defaultMatch[0] : '';
-    })
-    .replace(/:\s*[A-Z][a-zA-Z0-9<>\[\]|&\s,{}]*(\s*\{)/g, '$1')
-    .replace(/React\.(ReactNode|FC|Component|ComponentType|PropsWithChildren)/g, '')
-    .replace(/as\s+[A-Z][a-zA-Z0-9<>\[\]|&\s,{}]*/g, '')
-    .replace(/<[^>]+>/g, '')
-    .replace(/extends\s+React\.\w+<[^>]+>/g, '')
-    .replace(/extends\s+[A-Z][a-zA-Z0-9<>\[\]|&\s,{}]*/g, '');
+    .replace(/interface\s+\w+[^{]*\{[^}]*\}/g, '');
+  
+  // Remove type imports
+  jsContent = jsContent.replace(/import\s+type\s+.*?from\s+['"][^'"]+['"];?\n/g, '');
+  
+  // Remove TypeScript generic type parameters (but not JSX)
+  // Match generics like Array<string>, React.FC<Props>, useState<string>()
+  // JSX typically has attributes (key="value"), quotes, or is self-closing (/>), generics don't
+  // Only match simple generics (no quotes, no /, no = which indicate JSX)
+  jsContent = jsContent.replace(/(\w+)\s*<([^>/="']+)>(?=\s*[\(\[\{\.\s,;=]|$)/g, '$1');
+  
+  // Remove type annotations from function parameters
+  jsContent = jsContent.replace(/:\s*[A-Z][a-zA-Z0-9<>\[\]|&\s,{}]*(\s*=\s*[^,)]+)?/g, (match) => {
+    const defaultMatch = match.match(/=\s*.+/);
+    return defaultMatch ? defaultMatch[0] : '';
+  });
+  
+  // Remove return type annotations
+  jsContent = jsContent.replace(/:\s*[A-Z][a-zA-Z0-9<>\[\]|&\s,{}]*(\s*\{)/g, '$1');
+  
+  // Remove React type helpers
+  jsContent = jsContent.replace(/React\.(ReactNode|FC|Component|ComponentType|PropsWithChildren)/g, '');
+  
+  // Remove type assertions (as Type)
+  jsContent = jsContent.replace(/as\s+[A-Z][a-zA-Z0-9<>\[\]|&\s,{}]*/g, '');
+  
+  // Remove extends clauses with types
+  jsContent = jsContent.replace(/extends\s+React\.\w+<[^>]+>/g, '');
+  jsContent = jsContent.replace(/extends\s+[A-Z][a-zA-Z0-9<>\[\]|&\s,{}]*/g, '');
 
   // Remove TypeScript non-null assertion operator (!)
-  // Match ! when it appears after identifiers, ), ], }, etc. but not before =, ==, ===
   jsContent = jsContent.replace(/(\w+|\)|\]|\})\s*!(?=\s*[.,;)\[\]\}\s]|$)/g, '$1');
   jsContent = jsContent.replace(/(\w+|\)|\]|\})\s*!(?=\s*\.)/g, '$1');
   jsContent = jsContent.replace(/(\w+|\)|\]|\})\s*!(?=\s*\[)/g, '$1');
 
+  // Update import paths
   jsContent = jsContent.replace(/from\s+['"]([^'"]+)\.tsx?['"]/g, "from '$1.jsx'");
   jsContent = jsContent.replace(/from\s+['"]([^'"]+)\.tsx?['"]/g, "from '$1.js'");
-  jsContent = jsContent.replace(/import\s+type\s+.*?from\s+['"][^'"]+['"];?\n/g, '');
+  
+  // Clean up trailing commas in function calls/arrays/objects
+  jsContent = jsContent.replace(/,\s*\)/g, ')');
+  jsContent = jsContent.replace(/,\s*\]/g, ']');
+  jsContent = jsContent.replace(/,\s*\}/g, '}');
+  
+  // Clean up multiple blank lines
+  jsContent = jsContent.replace(/\n\s*\n\s*\n/g, '\n\n');
   
   return jsContent;
 }
@@ -159,7 +187,34 @@ async function copyBaseFiles(basePath, targetPath, useTypeScript) {
     const stat = await fs.stat(srcPath);
     
     if (stat.isDirectory()) {
-      await fs.copy(srcPath, destPath);
+      // Handle src directory specially - convert .tsx/.ts files to .jsx/.js for JavaScript
+      if (file === 'src' && !useTypeScript) {
+        const srcDir = path.join(basePath, 'src');
+        const destSrcDir = path.join(targetPath, 'src');
+        await fs.ensureDir(destSrcDir);
+        const srcFiles = await fs.readdir(srcDir);
+        for (const srcFile of srcFiles) {
+          const srcFilePath = path.join(srcDir, srcFile);
+          const srcFileStat = await fs.stat(srcFilePath);
+          if (srcFileStat.isFile()) {
+            if (srcFile.endsWith('.tsx')) {
+              const content = await fs.readFile(srcFilePath, 'utf-8');
+              const jsContent = convertTsToJs(content);
+              const jsxPath = path.join(destSrcDir, srcFile.replace(/\.tsx$/, '.jsx'));
+              await fs.writeFile(jsxPath, jsContent, 'utf-8');
+            } else if (srcFile.endsWith('.ts') && !srcFile.endsWith('.d.ts')) {
+              const content = await fs.readFile(srcFilePath, 'utf-8');
+              const jsContent = convertTsToJs(content);
+              const jsPath = path.join(destSrcDir, srcFile.replace(/\.ts$/, '.js'));
+              await fs.writeFile(jsPath, jsContent, 'utf-8');
+            } else {
+              await fs.copy(srcFilePath, path.join(destSrcDir, srcFile));
+            }
+          }
+        }
+      } else {
+        await fs.copy(srcPath, destPath);
+      }
     } else {
       if (!useTypeScript && (file === 'tsconfig.json' || file === 'tsconfig.node.json')) {
         continue;
@@ -179,6 +234,14 @@ async function copyBaseFiles(basePath, targetPath, useTypeScript) {
           ''
         );
         await fs.writeFile(destPath, updatedHtml, 'utf-8');
+      } else if (!useTypeScript && file === 'vite.config.ts') {
+        // Convert vite.config.ts to vite.config.js
+        const content = await fs.readFile(srcPath, 'utf-8');
+        const jsContent = convertTsToJs(content);
+        await fs.writeFile(path.join(targetPath, 'vite.config.js'), jsContent, 'utf-8');
+      } else if (!useTypeScript && (file.endsWith('.tsx') || (file.endsWith('.ts') && !file.endsWith('.d.ts')))) {
+        // Skip other .tsx/.ts files in root - they'll be handled by convertToJavaScript
+        // (src files are already handled above)
       } else {
         await fs.copy(srcPath, destPath);
       }

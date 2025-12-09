@@ -34,12 +34,18 @@ export async function askQuestions() {
       message: 'Select a component library:',
       choices: [
         { name: 'Material UI', value: 'mui' },
-        { name: 'shadcn/ui', value: 'shadcn' },
+        { name: 'shadcn/ui (requires Tailwind CSS)', value: 'shadcn' },
         { name: 'Ant Design', value: 'antd' },
         { name: 'None', value: 'none' }
       ]
     }
   ]);
+
+  // Automatically enable Tailwind CSS if shadcn/ui is selected
+  if (answers.componentLibrary === 'shadcn' && !answers.tailwind) {
+    answers.tailwind = true;
+    console.log('\n⚠️  Note: Tailwind CSS has been automatically enabled (required for shadcn/ui)');
+  }
 
   return answers;
 }

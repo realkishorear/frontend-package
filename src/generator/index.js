@@ -32,6 +32,12 @@ function convertTsToJs(content) {
     .replace(/extends\s+React\.\w+<[^>]+>/g, '')
     .replace(/extends\s+[A-Z][a-zA-Z0-9<>\[\]|&\s,{}]*/g, '');
 
+  // Remove TypeScript non-null assertion operator (!)
+  // Match ! when it appears after identifiers, ), ], }, etc. but not before =, ==, ===
+  jsContent = jsContent.replace(/(\w+|\)|\]|\})\s*!(?=\s*[.,;)\[\]\}\s]|$)/g, '$1');
+  jsContent = jsContent.replace(/(\w+|\)|\]|\})\s*!(?=\s*\.)/g, '$1');
+  jsContent = jsContent.replace(/(\w+|\)|\]|\})\s*!(?=\s*\[)/g, '$1');
+
   jsContent = jsContent.replace(/from\s+['"]([^'"]+)\.tsx?['"]/g, "from '$1.jsx'");
   jsContent = jsContent.replace(/from\s+['"]([^'"]+)\.tsx?['"]/g, "from '$1.js'");
   jsContent = jsContent.replace(/import\s+type\s+.*?from\s+['"][^'"]+['"];?\n/g, '');
@@ -98,12 +104,14 @@ async function convertToJavaScript(targetPath) {
 }
 
 export async function generateProject(targetPath, answers) {
+  // Ensure Tailwind is enabled for shadcn/ui (should be handled in prompts, but double-check)
+  if (answers.componentLibrary === 'shadcn' && !answers.tailwind) {
+    answers.tailwind = true;
+    console.log(chalk.yellow('⚠️  Note: Tailwind CSS has been automatically enabled (required for shadcn/ui)'));
+  }
+
   const { language, template, tailwind, componentLibrary } = answers;
   const useTypeScript = language === 'typescript';
-
-  if (componentLibrary === 'shadcn' && !tailwind) {
-    throw new Error('shadcn/ui requires Tailwind CSS. Please select Tailwind CSS when using shadcn/ui.');
-  }
 
   const templatePath = path.join(__dirname, 'templates', template);
 

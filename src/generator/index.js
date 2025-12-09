@@ -64,10 +64,10 @@ export async function generateProject(targetPath, answers) {
   console.log(chalk.blue('📦 Installing dependencies...'));
   await installDependencies(targetPath);
 
-  // Add shadcn examples for dashboard + shadcn combination
+  // Setup App.tsx for dashboard + shadcn combination
   if (template === 'dashboard' && componentLibrary === 'shadcn') {
-    console.log(chalk.blue('🎨 Adding shadcn/ui examples...'));
-    await addShadcnExamples(targetPath);
+    console.log(chalk.blue('🎨 Setting up login and dashboard routing...'));
+    await setupDashboardShadcnRouting(targetPath);
   }
 }
 
@@ -100,15 +100,8 @@ async function copyTemplateFiles(templatePath, targetPath, template, answers) {
     const stat = await fs.stat(srcPath);
     
     if (stat.isDirectory()) {
-      // Skip copying pages directory if using shadcn examples (they'll be added by shadcn CLI)
-      if (useShadcnExamples && file === 'pages') {
-        continue;
-      }
-      // Skip copying components directory if using shadcn examples (they'll be added by shadcn CLI)
-      if (useShadcnExamples && file === 'components') {
-        continue;
-      }
       // Copy directories (pages, components, layout, etc.) to src/
+      // Pages directory now contains login-01.tsx and dashboard-01.tsx for shadcn
       await fs.copy(srcPath, path.join(targetPath, 'src', file));
     } else if (file !== 'App.tsx' && file !== 'Dashboard.tsx' && file !== 'Landing.tsx') {
       // Copy other files to root
@@ -117,9 +110,9 @@ async function copyTemplateFiles(templatePath, targetPath, template, answers) {
   }
   
   // Handle template-specific App.tsx
-  // Skip if using shadcn examples (App.tsx will be created after shadcn CLI runs)
+  // For dashboard + shadcn, App.tsx will be created by setupDashboardShadcnRouting
   if (useShadcnExamples) {
-    // Create a placeholder App.tsx that will be updated after shadcn examples are added
+    // Create a placeholder App.tsx that will be updated by setupDashboardShadcnRouting
     const appTsxPath = path.join(targetPath, 'src', 'App.tsx');
     const appContent = `import { Routes, Route } from 'react-router-dom'
 
@@ -134,7 +127,7 @@ function App() {
 export default App
 `;
     await fs.writeFile(appTsxPath, appContent);
-    return; // Exit early, App.tsx will be updated by updateAppWithShadcnExamples
+    return; // Exit early, App.tsx will be updated by setupDashboardShadcnRouting
   }
   
   const templateAppPath = path.join(templatePath, 
@@ -1203,54 +1196,143 @@ async function installDependencies(targetPath) {
   }
 }
 
-async function addShadcnExamples(targetPath) {
-  try {
-    // Add login-01 example
-    console.log(chalk.blue('  Adding login-01 example...'));
-    const loginResult = await execa('npx', ['shadcn@latest', 'add', 'login-01', '--yes', '--overwrite'], {
-      cwd: targetPath,
-      stdio: 'pipe' // Capture output to check for errors
-    });
-    
-    if (loginResult.exitCode !== 0) {
-      console.warn(chalk.yellow(`  Warning: login-01 command exited with code ${loginResult.exitCode}`));
-      console.warn(chalk.yellow(`  Output: ${loginResult.stdout}`));
-      if (loginResult.stderr) {
-        console.warn(chalk.yellow(`  Error: ${loginResult.stderr}`));
-      }
-    } else {
-      console.log(chalk.green('  ✅ login-01 added successfully'));
-    }
-
-    // Add dashboard-01 example
-    console.log(chalk.blue('  Adding dashboard-01 example...'));
-    const dashboardResult = await execa('npx', ['shadcn@latest', 'add', 'dashboard-01', '--yes', '--overwrite'], {
-      cwd: targetPath,
-      stdio: 'pipe' // Capture output to check for errors
-    });
-    
-    if (dashboardResult.exitCode !== 0) {
-      console.warn(chalk.yellow(`  Warning: dashboard-01 command exited with code ${dashboardResult.exitCode}`));
-      console.warn(chalk.yellow(`  Output: ${dashboardResult.stdout}`));
-      if (dashboardResult.stderr) {
-        console.warn(chalk.yellow(`  Error: ${dashboardResult.stderr}`));
-      }
-    } else {
-      console.log(chalk.green('  ✅ dashboard-01 added successfully'));
-    }
-
-    // Wait a bit for file system to sync
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Update App.tsx to use the shadcn examples
-    await updateAppWithShadcnExamples(targetPath);
-  } catch (error) {
-    console.error(chalk.red(`  ❌ Error adding shadcn examples: ${error.message}`));
-    console.error(chalk.yellow('  You may need to manually run:'));
-    console.error(chalk.yellow('    npx shadcn@latest add login-01'));
-    console.error(chalk.yellow('    npx shadcn@latest add dashboard-01'));
-    throw error;
+async function setupDashboardShadcnRouting(targetPath) {
+  const appTsxPath = path.join(targetPath, 'src', 'App.tsx');
+  
+  // Check if login-01 and dashboard-01 components exist (they should be copied from template)
+  const loginPath = path.join(targetPath, 'src', 'pages', 'login-01.tsx');
+  const dashboardPath = path.join(targetPath, 'src', 'pages', 'dashboard-01.tsx');
+  
+  if (!(await fs.pathExists(loginPath))) {
+    console.warn(chalk.yellow(`  Warning: login-01.tsx not found at ${loginPath}`));
   }
+  
+  if (!(await fs.pathExists(dashboardPath))) {
+    console.warn(chalk.yellow(`  Warning: dashboard-01.tsx not found at ${dashboardPath}`));
+  }
+  
+  // Create App.tsx with routing: /auth -> login-01, /dashboard -> dashboard-01
+  const appContent = `import { useEffect, useRef } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import Login01 from './pages/login-01'
+import Dashboard01 from './pages/dashboard-01'
+
+// Wrap login-01 to intercept form submissions and navigate to dashboard-01
+// Accepts any username/password - no validation required
+function Login() {
+  const navigate = useNavigate()
+  const containerRef = useRef<HTMLDivElement>(null)
+  
+  useEffect(() => {
+    // Intercept form submissions to navigate to dashboard-01
+    // Accept any username/password - no validation needed
+    const container = containerRef.current
+    if (!container) return
+    
+    const navigateToDashboard = () => {
+      // Navigate to dashboard-01 after any login attempt
+      navigate('/dashboard')
+    }
+    
+    const handleSubmit = (e: Event) => {
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
+      navigateToDashboard()
+      return false
+    }
+    
+    // Find all forms and intercept their submit events (capture phase - before React handlers)
+    const forms = container.querySelectorAll('form')
+    forms.forEach(form => {
+      // Override the form's submit handler
+      form.onsubmit = handleSubmit
+      // Also add event listener in capture phase to catch before React
+      form.addEventListener('submit', handleSubmit, { capture: true, passive: false })
+    })
+    
+    // Intercept button clicks that might trigger form submission
+    const submitButtons = container.querySelectorAll('button[type="submit"], button:not([type])')
+    submitButtons.forEach(button => {
+      const handleClick = (e: MouseEvent) => {
+        const form = button.closest('form')
+        if (form) {
+          e.preventDefault()
+          e.stopPropagation()
+          e.stopImmediatePropagation()
+          navigateToDashboard()
+        }
+      }
+      // Use capture phase to intercept before React handlers
+      button.addEventListener('click', handleClick, { capture: true, passive: false })
+    })
+    
+    // Handle Enter key presses in input fields
+    const inputs = container.querySelectorAll('input[type="email"], input[type="text"], input[type="password"]')
+    inputs.forEach(input => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Enter') {
+          const form = input.closest('form')
+          if (form) {
+            e.preventDefault()
+            e.stopPropagation()
+            navigateToDashboard()
+          }
+        }
+      }
+      input.addEventListener('keydown', handleKeyDown, { capture: true, passive: false })
+    })
+    
+    // Use MutationObserver to catch dynamically added forms/buttons
+    const observer = new MutationObserver(() => {
+      // Re-apply handlers for any newly added forms/buttons
+      const newForms = container.querySelectorAll('form')
+      newForms.forEach(form => {
+        if (!form.hasAttribute('data-login-handled')) {
+          form.setAttribute('data-login-handled', 'true')
+          form.onsubmit = handleSubmit
+          form.addEventListener('submit', handleSubmit, { capture: true, passive: false })
+        }
+      })
+    })
+    
+    observer.observe(container, {
+      childList: true,
+      subtree: true
+    })
+    
+    return () => {
+      forms.forEach(form => {
+        form.removeEventListener('submit', handleSubmit, { capture: true } as any)
+        form.onsubmit = null
+      })
+      observer.disconnect()
+    }
+  }, [navigate])
+  
+  return (
+    <div ref={containerRef}>
+      <Login01 />
+    </div>
+  )
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/auth" element={<Login />} />
+      <Route path="/dashboard" element={<Dashboard01 />} />
+      <Route path="/" element={<Navigate to="/auth" replace />} />
+      <Route path="*" element={<Navigate to="/auth" replace />} />
+    </Routes>
+  )
+}
+
+export default App
+`;
+
+  await fs.writeFile(appTsxPath, appContent);
+  console.log(chalk.green('  ✅ App.tsx configured with /auth and /dashboard routes'));
 }
 
 async function findFileRecursively(dir, searchPattern) {

@@ -1,97 +1,152 @@
 # jgd-fe-cli
 
-A frontend scaffolding CLI tool that creates React + Vite + TypeScript + TailwindCSS projects with a single command.
+A custom React project generator CLI that creates React + TypeScript projects with interactive prompts, multiple templates, optional Tailwind CSS, and component library support.
 
 ## Installation
 
 Install and run using npx:
 
 ```bash
-npx github:myusername/jgd-fe-cli init my-app
+npx github.com/<username>/<repo> init my-app
 ```
 
-Or install globally:
+Or initialize in the current directory:
 
 ```bash
-npm install -g github:myusername/jgd-fe-cli
-jgd-fe init my-app
+npx github.com/<username>/<repo> init .
 ```
 
 ## Usage
 
-Create a new project:
+Run the init command:
 
 ```bash
 jgd-fe init <project-name>
 ```
 
-This will:
-1. Create a new folder with your project name
-2. Copy the React + Vite + TypeScript + TailwindCSS template
-3. Install all dependencies
-4. Print instructions for starting the dev server
+The CLI will ask you interactive questions:
 
-Example:
+1. **Template Type**: Choose from:
+   - Dashboard
+   - Landing Page
+   - Nothing (Empty Starter)
 
-```bash
-jgd-fe init my-awesome-app
-cd my-awesome-app
-npm run dev
-```
+2. **Tailwind CSS**: Yes or No
+
+3. **Component Library**: Choose from:
+   - Material UI
+   - shadcn/ui
+   - Ant Design
+   - None
+
+After answering the questions, the CLI will:
+- Copy the selected template
+- Set up Tailwind CSS (if selected)
+- Configure the chosen component library
+- Install all dependencies automatically
+- Print instructions for starting the dev server
 
 ## Project Structure
 
 ```
 /jgd-fe-cli
- ├─ package.json
  ├─ bin/
- │   └─ jgd-fe.js
- ├─ templates/
- │   └─ react-tailwind/
- │        ├─ package.json
- │        ├─ index.html
- │        ├─ tailwind.config.js
- │        ├─ postcss.config.js
- │        ├─ tsconfig.json
- │        ├─ vite.config.ts
- │        └─ src/
- │             ├─ main.tsx
- │             ├─ App.tsx
- │             ├─ pages/
- │             │     ├─ Home.tsx
- │             │     └─ About.tsx
- │             └─ index.css
+ │   └─ cli.js
+ ├─ src/
+ │   ├─ index.js
+ │   ├─ prompts.js
+ │   └─ generator/
+ │        ├─ index.js
+ │        ├─ base/
+ │        │   ├─ package.json
+ │        │   ├─ vite.config.ts
+ │        │   ├─ tsconfig.json
+ │        │   ├─ index.html
+ │        │   └─ src/
+ │        │        ├─ main.tsx
+ │        │        └─ App.tsx
+ │        └─ templates/
+ │             ├─ dashboard/
+ │             │   ├─ Dashboard.tsx
+ │             │   ├─ pages/
+ │             │   ├─ components/
+ │             │   └─ layout/
+ │             ├─ landing/
+ │             │   ├─ Landing.tsx
+ │             │   ├─ pages/
+ │             │   └─ components/
+ │             └─ empty/
+ │                  └─ App.tsx
+ ├─ package.json
  └─ README.md
 ```
 
-## Template Features
+## Templates
 
-The `react-tailwind` template includes:
+### Dashboard Template
 
-- ✅ **Vite** - Fast build tool and dev server
-- ✅ **React 18** - Latest React with hooks
-- ✅ **TypeScript** - Type-safe development
-- ✅ **TailwindCSS** - Utility-first CSS framework
-- ✅ **React Router** - Client-side routing
-- ✅ **Custom Colors** - Pre-configured primary (#1E40AF) and secondary (#14B8A6) colors
-- ✅ **Example Pages** - Home and About pages with navigation
+A full-featured dashboard with:
+- Sidebar navigation
+- Multiple pages (Home, Analytics, Settings)
+- Responsive layout
+- Ready for data visualization
 
-## Adding New Templates
+### Landing Page Template
 
-To add a new template:
+A modern landing page with:
+- Hero section
+- Features section
+- Footer
+- About and Contact pages
+- Navigation
 
-1. Create a new folder under `templates/` (e.g., `templates/vue-nuxt/`)
-2. Add your template files in that folder
-3. Update the CLI to support template selection (optional)
+### Empty Template
 
-Example structure:
+A minimal starter with:
+- Basic React setup
+- Clean slate for your project
 
-```
-templates/
- ├─ react-tailwind/
- └─ vue-nuxt/
-    └─ ... (your template files)
-```
+## Component Libraries
+
+### Material UI
+
+Automatically installs:
+- `@mui/material`
+- `@emotion/react`
+- `@emotion/styled`
+
+### shadcn/ui
+
+Automatically installs and configures:
+- `class-variance-authority`
+- `clsx`
+- `tailwind-merge`
+- `lucide-react`
+- Creates `components.json` config
+- Sets up path aliases (`@/components`, `@/lib/utils`)
+- Generates a default Button component
+- Configures Tailwind with shadcn theme variables
+
+### Ant Design
+
+Automatically installs:
+- `antd`
+
+## Tailwind CSS
+
+When Tailwind is selected, the CLI:
+- Creates `tailwind.config.js`
+- Creates `postcss.config.js`
+- Creates `src/styles/tailwind.css`
+- Adds Tailwind directives
+- Imports the CSS in `main.tsx`
+
+## Package Manager Detection
+
+The CLI automatically detects your package manager:
+- npm (default)
+- pnpm (if `pnpm-lock.yaml` exists)
+- yarn (if `yarn.lock` exists)
 
 ## Development
 
@@ -107,6 +162,16 @@ npm link
 # Test the CLI
 jgd-fe init test-app
 ```
+
+## Adding New Templates
+
+To add a new template:
+
+1. Create a new folder under `src/generator/templates/`
+2. Add your template files:
+   - Main component file (e.g., `MyTemplate.tsx`)
+   - Pages, components, layouts as needed
+3. Update `src/prompts.js` to include your template in the choices
 
 ## License
 

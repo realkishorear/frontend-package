@@ -8,7 +8,7 @@ export async function askQuestions() {
       message: 'Select a template:',
       choices: [
         { name: 'Dashboard', value: 'dashboard' },
-        { name: 'Landing Page', value: 'landing' },
+        { name: 'website', value: 'landing' },
         { name: 'Nothing (Empty Starter)', value: 'empty' }
       ]
     },

@@ -28,7 +28,7 @@ The CLI will ask you interactive questions:
 
 1. **Template Type**: Choose from:
    - Dashboard
-   - Landing Page
+   - website
    - Nothing (Empty Starter)
 
 2. **Tailwind CSS**: Yes or No
@@ -91,9 +91,9 @@ A full-featured dashboard with:
 - Responsive layout
 - Ready for data visualization
 
-### Landing Page Template
+### website Template
 
-A modern landing page with:
+A modern website with:
 - Hero section
 - Features section
 - Footer

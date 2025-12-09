@@ -7,6 +7,17 @@ import chalk from 'chalk';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Helper function to read JSONC (JSON with Comments) files
+async function readJsonc(filePath) {
+  const content = await fs.readFile(filePath, 'utf-8');
+  // Strip single-line comments (// ...)
+  // Strip multi-line comments (/* ... */)
+  const jsonContent = content
+    .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
+    .replace(/\/\/.*$/gm, ''); // Remove // comments
+  return JSON.parse(jsonContent);
+}
+
 export async function generateProject(targetPath, answers) {
   const { template, tailwind, componentLibrary } = answers;
 
@@ -335,7 +346,7 @@ export { Button, buttonVariants }
   // Update tsconfig.json to add path aliases
   const tsconfigPath = path.join(targetPath, 'tsconfig.json');
   if (await fs.pathExists(tsconfigPath)) {
-    const tsconfig = await fs.readJson(tsconfigPath);
+    const tsconfig = await readJsonc(tsconfigPath);
     tsconfig.compilerOptions = tsconfig.compilerOptions || {};
     tsconfig.compilerOptions.paths = {
       "@/*": ["./src/*"]

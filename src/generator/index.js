@@ -45,6 +45,14 @@ export async function generateProject(targetPath, answers) {
       await fs.copy(baseSrcPath, targetSrcPath);
     }
 
+    // Copy public directory (for config.json and other static assets)
+    const basePublicPath = path.join(basePath, 'public');
+    const targetPublicPath = path.join(targetPath, 'public');
+    if (await fs.pathExists(basePublicPath)) {
+      await fs.copy(basePublicPath, targetPublicPath);
+      console.log(chalk.blue('📁 Copied public directory with config.json...'));
+    }
+
     // Copy template files
     if (await fs.pathExists(templatePath)) {
       console.log(chalk.blue(`📁 Copying ${template} template files...`));

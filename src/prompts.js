@@ -4,6 +4,16 @@ export async function askQuestions() {
   const answers = await inquirer.prompt([
     {
       type: 'list',
+      name: 'language',
+      message: 'Select language:',
+      choices: [
+        { name: 'TypeScript', value: 'typescript' },
+        { name: 'JavaScript', value: 'javascript' }
+      ],
+      default: 'typescript'
+    },
+    {
+      type: 'list',
       name: 'template',
       message: 'Select a template:',
       choices: [

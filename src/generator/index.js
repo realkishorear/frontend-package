@@ -35,13 +35,31 @@ function convertTsToJs(content) {
   jsContent = jsContent.replace(/(\w+)\s*<([^>/="']+)>(?=\s*[\(\[\{\.\s,;=]|$)/g, '$1');
   
   // Remove type annotations from function parameters
-  jsContent = jsContent.replace(/:\s*[A-Z][a-zA-Z0-9<>\[\]|&\s,{}]*(\s*=\s*[^,)]+)?/g, (match) => {
-    const defaultMatch = match.match(/=\s*.+/);
-    return defaultMatch ? defaultMatch[0] : '';
-  });
+  // Match : type (including unions like string | boolean) but preserve default values
+  // Handle union types: string | boolean | number, etc.
+  // First handle parameters with default values (must come before the general case)
+  jsContent = jsContent.replace(/:\s*([a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]*|string|number|boolean|void|any|unknown|never|undefined|null)(\s*\|\s*([a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]*|string|number|boolean|void|any|unknown|never|undefined|null))+\s*=\s*/g, ' = ');
+  jsContent = jsContent.replace(/:\s*([a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]*|string|number|boolean|void|any|unknown|never|undefined|null)\s*=\s*/g, ' = ');
   
-  // Remove return type annotations
-  jsContent = jsContent.replace(/:\s*[A-Z][a-zA-Z0-9<>\[\]|&\s,{}]*(\s*\{)/g, '$1');
+  // Then remove remaining type annotations (without default values)
+  // Handle union types first (more specific pattern)
+  jsContent = jsContent.replace(/:\s*(string|number|boolean|void|any|unknown|never|undefined|null)(\s*\|\s*(string|number|boolean|void|any|unknown|never|undefined|null))+(?=\s*[,)])/g, '');
+  jsContent = jsContent.replace(/:\s*([a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]+)(\s*\|\s*([a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]+|string|number|boolean|void|any|unknown|never|undefined|null))+(?=\s*[,)])/g, '');
+  // Then simple types (primitive types first, then complex)
+  jsContent = jsContent.replace(/:\s*(string|number|boolean|void|any|unknown|never|undefined|null)(?=\s*[,)])/g, '');
+  jsContent = jsContent.replace(/:\s*[a-zA-Z_$][a-zA-Z0-9<>\[\]|&\s,{}\._$]*(?=\s*[,)])/g, '');
+  
+  // Remove object type annotations like { name: string, age: number } (but not object literals)
+  // Look for : { ... } followed by = or , or ; or )
+  jsContent = jsContent.replace(/:\s*\{[^}]*:\s*[a-zA-Z][a-zA-Z0-9<>\[\]|&\s,{}\.]*[^}]*\}(?=\s*[=,;\)])/g, '');
+  
+  // Remove return type annotations (after ) before => or {)
+  // Must match the whole pattern including the ) to avoid breaking =>
+  jsContent = jsContent.replace(/\)\s*:\s*([a-zA-Z][a-zA-Z0-9<>\[\]|&\s,{}\.]*|string|number|boolean|void|any|unknown|never)\s*=>/g, ') =>');
+  jsContent = jsContent.replace(/\)\s*:\s*([a-zA-Z][a-zA-Z0-9<>\[\]|&\s,{}\.]*|string|number|boolean|void|any|unknown|never)\s*\{/g, ') {');
+  
+  // Also handle return types in regular function declarations
+  jsContent = jsContent.replace(/\)\s*:\s*([a-zA-Z][a-zA-Z0-9<>\[\]|&\s,{}\.]*|string|number|boolean|void|any|unknown|never)(\s*\{)/g, ')$2');
   
   // Remove React type helpers
   jsContent = jsContent.replace(/React\.(ReactNode|FC|Component|ComponentType|PropsWithChildren)/g, '');

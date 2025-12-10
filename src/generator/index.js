@@ -151,8 +151,9 @@ export default App
           scssContent = scssContent.trim();
         }
         
-        // If empty or only had Tailwind, add basic SASS structure
-        if (!scssContent || scssContent.length === 0) {
+        // If empty or only had Tailwind, add basic SCSS structure
+        // (CSS is valid SCSS, so this will work fine)
+        if (!scssContent || scssContent.trim().length === 0) {
           scssContent = `// Main stylesheet
 // This file will be compiled to CSS by Vite
 
@@ -172,35 +173,25 @@ body {
 `;
         }
         
-        // Ensure SCSS content is not just whitespace
-        if (scssContent.trim().length === 0) {
-          scssContent = `// Main stylesheet
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-}
-`;
-        }
-        
-        // Write SCSS file
-        await fs.writeFile(scssPath, scssContent);
-        
-        // Verify SCSS file was created
-        if (await fs.pathExists(scssPath)) {
-          console.log(chalk.green(`✅ Created ${path.basename(scssPath)}`));
-        } else {
-          console.log(chalk.red(`❌ Failed to create ${path.basename(scssPath)}`));
-        }
-        
-        // Remove CSS file if it exists
+        // Remove CSS file first (if it exists) to avoid conflicts
         if (await fs.pathExists(cssPath)) {
           await fs.remove(cssPath);
           console.log(chalk.blue(`🗑️  Removed old ${path.basename(cssPath)}`));
+        }
+        
+        // Write SCSS file
+        await fs.writeFile(scssPath, scssContent, 'utf-8');
+        
+        // Verify SCSS file was created and has content
+        if (await fs.pathExists(scssPath)) {
+          const writtenContent = await fs.readFile(scssPath, 'utf-8');
+          if (writtenContent.trim().length > 0) {
+            console.log(chalk.green(`✅ Created ${path.basename(scssPath)} with ${writtenContent.split('\n').length} lines`));
+          } else {
+            console.log(chalk.yellow(`⚠️  Created ${path.basename(scssPath)} but file appears empty`));
+          }
+        } else {
+          console.log(chalk.red(`❌ Failed to create ${path.basename(scssPath)}`));
         }
 
         // Update main.tsx to import .scss instead of .css
@@ -209,23 +200,20 @@ body {
           let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
           
           // Replace any import of index.css with index.scss
-          // Handle various import patterns
-          if (mainContent.includes("import './index.css'")) {
-            mainContent = mainContent.replace("import './index.css'", "import './index.scss'");
-          } else if (mainContent.includes('import "./index.css"')) {
-            mainContent = mainContent.replace('import "./index.css"', 'import "./index.scss"');
-          } else if (mainContent.includes("import '../index.css'")) {
-            mainContent = mainContent.replace("import '../index.css'", "import './index.scss'");
-          } else {
-            // Fallback: use regex for any other pattern
-            mainContent = mainContent.replace(
-              /import\s+(['"])([^'"]*\/)?index\.css\1/g,
-              "import './index.scss'"
-            );
-          }
+          // Simple and reliable: just replace index.css with index.scss in import statements
+          // This handles: './index.css', "./index.css", '../index.css', 'index.css', etc.
+          const originalContent = mainContent;
           
-          // Final fallback: simple string replace
-          if (mainContent.includes('index.css') && !mainContent.includes('index.scss')) {
+          // First, try to match and replace the full import line
+          mainContent = mainContent.replace(
+            /(import\s+['"][^'"]*?)index\.css(['"])/g,
+            '$1index.scss$2'
+          );
+          
+          // If that didn't work, use a more aggressive fallback
+          if (mainContent === originalContent && mainContent.includes('index.css')) {
+            console.log(chalk.yellow('   Using fallback replacement method...'));
+            // Replace index.css anywhere in import statements
             mainContent = mainContent.replace(/index\.css/g, 'index.scss');
           }
           
@@ -235,15 +223,24 @@ body {
           const scssExists = await fs.pathExists(scssPath);
           const updatedContent = await fs.readFile(mainTsxPath, 'utf-8');
           const hasScssImport = updatedContent.includes('index.scss');
+          const stillHasCssImport = updatedContent.includes('index.css');
           
-          if (scssExists && hasScssImport) {
+          // Show what was found in main.tsx for debugging
+          const importLines = updatedContent.split('\n').filter(line => line.includes('index.'));
+          if (importLines.length > 0) {
+            console.log(chalk.gray(`   Found imports: ${importLines.join(', ')}`));
+          }
+          
+          if (scssExists && hasScssImport && !stillHasCssImport) {
             console.log(chalk.green('✅ SCSS setup complete: file created and import updated'));
           } else {
             if (!scssExists) {
               console.log(chalk.red('❌ Error: SCSS file was not created'));
             }
-            if (!hasScssImport) {
-              console.log(chalk.yellow('⚠️  Warning: Import not updated. Please manually change index.css to index.scss in main.tsx'));
+            if (!hasScssImport || stillHasCssImport) {
+              console.log(chalk.yellow('⚠️  Warning: Import not updated correctly'));
+              console.log(chalk.yellow(`   Current main.tsx still has: ${stillHasCssImport ? 'index.css' : 'no SCSS import'}`));
+              console.log(chalk.yellow('   Please manually change index.css to index.scss in main.tsx'));
             }
           }
         } else {
@@ -281,7 +278,7 @@ body {
     // Handle component library
     if (componentLibrary !== 'none') {
       if (componentLibrary === 'shadcn') {
-        console.log(chalk.blue(`ℹ️  Shadcn/ui selected - you'll need to initialize it separately after project creation`));
+        console.log(chalk.blue(`ℹ️ Shadcn/ui selected - you'll need to initialize it separately after project creation`));
         console.log(chalk.gray(`   Run: npx shadcn-ui@latest init`));
       } else {
         console.log(chalk.yellow(`ℹ️  Component library "${componentLibrary}" will be installed with dependencies`));
@@ -292,6 +289,15 @@ body {
     // Read package.json fresh to ensure we have the latest version (after CSS framework changes)
     if (await fs.pathExists(packageJsonPath)) {
       packageJson = await fs.readJson(packageJsonPath);
+      
+      // Ensure sass dependency is preserved if it was added earlier
+      if (cssFramework === 'sass' && (!packageJson.devDependencies || !packageJson.devDependencies.sass)) {
+        if (!packageJson.devDependencies) {
+          packageJson.devDependencies = {};
+        }
+        packageJson.devDependencies['sass'] = '^1.69.0';
+        console.log(chalk.blue('✅ Ensuring sass dependency is in package.json'));
+      }
       
       if (!packageJson.dependencies) {
         packageJson.dependencies = {};
@@ -372,8 +378,9 @@ body {
         console.log(chalk.green('   ✓ sass package installed'));
         console.log(chalk.green('   ✓ index.scss file exists'));
         console.log(chalk.green('   ✓ main.tsx imports index.scss'));
-        console.log(chalk.blue('\n💡 Vite will automatically compile your SCSS files when you run: npm run dev'));
-        console.log(chalk.blue('   Your SCSS will be compiled to CSS automatically - no manual steps needed!'));
+        console.log(chalk.blue('\n💡 Vite automatically compiles SCSS files - no configuration needed!'));
+        console.log(chalk.blue('   Changes to your SCSS files will hot-reload automatically during development.'));
+        console.log(chalk.blue('   Just run: npm run dev'));
       } else {
         console.log(chalk.yellow('⚠️  SCSS setup verification issues:'));
         if (!sassInstalled) {

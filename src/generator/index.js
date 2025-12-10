@@ -280,7 +280,12 @@ body {
 
     // Handle component library
     if (componentLibrary !== 'none') {
-      console.log(chalk.yellow(`ℹ️  Component library "${componentLibrary}" will be installed with dependencies`));
+      if (componentLibrary === 'shadcn') {
+        console.log(chalk.blue(`ℹ️  Shadcn/ui selected - you'll need to initialize it separately after project creation`));
+        console.log(chalk.gray(`   Run: npx shadcn-ui@latest init`));
+      } else {
+        console.log(chalk.yellow(`ℹ️  Component library "${componentLibrary}" will be installed with dependencies`));
+      }
     }
 
     // Update package.json with component library dependencies if needed
@@ -299,6 +304,7 @@ body {
       } else if (componentLibrary === 'antd') {
         packageJson.dependencies['antd'] = '^5.12.0';
       }
+      // Note: shadcn is not added here as it requires separate initialization via CLI
       
       // Save package.json with all dependencies (CSS framework + component library)
       await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });

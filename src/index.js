@@ -16,7 +16,12 @@ export async function initProject(projectName) {
       process.exit(1);
     }
 
-    console.log(chalk.blue('\n🚀 Welcome to JGD Frontend CLI!\n'));
+    // Welcome banner
+    console.log(chalk.cyan.bold('\n╔═══════════════════════════════════════════════════════╗'));
+    console.log(chalk.cyan.bold('║                                                       ║'));
+    console.log(chalk.cyan.bold('║     Welcome to JGD Frontend Template Generator        ║'));
+    console.log(chalk.cyan.bold('║                                                       ║'));
+    console.log(chalk.cyan.bold('╚═══════════════════════════════════════════════════════╝\n'));
 
     // Ask interactive questions
     const answers = await askQuestions();
@@ -31,6 +36,12 @@ export async function initProject(projectName) {
     if (projectName !== '.') {
       console.log(chalk.white(`   cd ${projectName}`));
     }
+    
+    // Add Shadcn setup instruction if selected
+    if (answers.componentLibrary === 'shadcn') {
+      console.log(chalk.cyan('   npx shadcn-ui@latest init'));
+    }
+    
     console.log(chalk.white('   npm run dev'));
     console.log(chalk.white('\n🎉 Happy coding!\n'));
 

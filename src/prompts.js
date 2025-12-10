@@ -1,41 +1,102 @@
 import inquirer from 'inquirer';
+import chalk from 'chalk';
+
+// Logo/Icon mappings
+const logos = {
+  tailwind: '⚡',
+  sass: '💎',
+  css: '🎨',
+  mui: '🎨',
+  antd: '🐜',
+  shadcn: '✨',
+  none: '🚫'
+};
 
 export async function askQuestions() {
-  const answers = await inquirer.prompt([
+  // First question: Application type
+  const templateAnswer = await inquirer.prompt([
     {
       type: 'list',
       name: 'template',
-      message: 'Select a template:',
+      message: chalk.cyan.bold('\nChoose what kind of application you want to build:'),
       choices: [
-        { name: 'Dashboard', value: 'dashboard' },
-        { name: 'website', value: 'landing' },
-        { name: 'Nothing (Empty Starter)', value: 'empty' }
-      ]
-    },
-    {
-      type: 'list',
-      name: 'cssFramework',
-      message: 'Select CSS framework:',
-      choices: [
-        { name: 'CSS', value: 'css' },
-        { name: 'SASS', value: 'sass' },
-        { name: 'Tailwind', value: 'tailwind' }
-      ],
-      default: 'tailwind'
-    },
-    {
-      type: 'list',
-      name: 'componentLibrary',
-      message: 'Select a component library:',
-      choices: [
-        { name: 'Material UI', value: 'mui' },
-        { name: 'shadcn/ui', value: 'shadcn' },
-        { name: 'Ant Design', value: 'antd' },
-        { name: 'None', value: 'none' }
+        { name: '📊 Dashboard', value: 'dashboard' },
+        { name: '🌐 Website', value: 'landing' },
+        { name: '📝 Different (Plain)', value: 'empty' }
       ]
     }
   ]);
 
-  return answers;
+  // Second question: CSS Framework
+  const cssAnswer = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'cssFramework',
+      message: chalk.cyan.bold('\nChoose the CSS Framework:'),
+      choices: [
+        { 
+          name: `${logos.tailwind} Tailwind ${chalk.gray('(Recommended)')}`, 
+          value: 'tailwind',
+          short: 'Tailwind'
+        },
+        { 
+          name: `${logos.sass} Sass`, 
+          value: 'sass',
+          short: 'Sass'
+        },
+        { 
+          name: `${logos.css} CSS`, 
+          value: 'css',
+          short: 'CSS'
+        }
+      ],
+      default: 'tailwind'
+    }
+  ]);
+
+  // Third question: Component Library (conditional based on CSS framework)
+  const componentChoices = [
+    { 
+      name: `${logos.mui} Material UI`, 
+      value: 'mui',
+      short: 'Material UI'
+    },
+    { 
+      name: `${logos.antd} AntDesign`, 
+      value: 'antd',
+      short: 'AntDesign'
+    }
+  ];
+
+  // Only add Shadcn if Tailwind is selected
+  if (cssAnswer.cssFramework === 'tailwind') {
+    componentChoices.push({
+      name: `${logos.shadcn} Shadcn`,
+      value: 'shadcn',
+      short: 'Shadcn'
+    });
+  }
+
+  componentChoices.push({
+    name: `${logos.none} No library`,
+    value: 'none',
+    short: 'No library'
+  });
+
+  const componentAnswer = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'componentLibrary',
+      message: chalk.cyan.bold('\nChoose component library:'),
+      choices: componentChoices
+    }
+  ]);
+
+  // Combine all answers
+  return {
+    ...templateAnswer,
+    ...cssAnswer,
+    ...componentAnswer
+  };
 }
 

@@ -8,7 +8,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export async function generateProject(targetPath, answers) {
-  const { template, cssFramework, componentLibrary } = answers;
+  let { template, cssFramework, componentLibrary } = answers;
+  
+  // Dashboard and Landing templates require Tailwind CSS
+  // Auto-switch to Tailwind if user selected a different CSS framework
+  if ((template === 'dashboard' || template === 'landing') && cssFramework !== 'tailwind') {
+    console.log(chalk.yellow(`\n⚠️  Warning: ${template === 'dashboard' ? 'Dashboard' : 'Landing'} template requires Tailwind CSS.`));
+    console.log(chalk.yellow(`   Automatically switching to Tailwind CSS for proper styling.\n`));
+    cssFramework = 'tailwind';
+  }
 
   try {
     // Get paths

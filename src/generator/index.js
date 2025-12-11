@@ -119,7 +119,9 @@ export default defineConfig({
       break;
 
     case 'webpack':
-      // Webpack configuration
+      // Webpack configuration - remove "type": "module" since webpack.config.js uses CommonJS
+      delete packageJson.type;
+      
       const webpackConfigPath = path.join(targetPath, 'webpack.config.js');
       const webpackConfigContent = `const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');

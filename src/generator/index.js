@@ -43,6 +43,8 @@ async function createTypeScriptConfig(targetPath, bundler) {
     // For webpack bundler
     baseConfig.compilerOptions.moduleResolution = "node";
     baseConfig.compilerOptions.allowImportingTsExtensions = false;
+    baseConfig.compilerOptions.allowSyntheticDefaultImports = true;
+    baseConfig.compilerOptions.esModuleInterop = true;
     // Relax unused checks for webpack to avoid build errors
     baseConfig.compilerOptions.noUnusedLocals = false;
     baseConfig.compilerOptions.noUnusedParameters = false;
@@ -266,6 +268,18 @@ export async function generateProject(targetPath, answers) {
     const targetSrcPath = path.join(targetPath, 'src');
     if (await fs.pathExists(baseSrcPath)) {
       await fs.copy(baseSrcPath, targetSrcPath);
+      
+      // For webpack, remove .tsx/.ts extensions from imports in main.tsx
+      if (bundler === 'webpack') {
+        const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
+        if (await fs.pathExists(mainTsxPath)) {
+          let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+          // Remove .tsx and .ts extensions from import statements
+          mainContent = mainContent.replace(/from\s+['"](\.\/[^'"]+)\.tsx['"]/g, "from '$1'");
+          mainContent = mainContent.replace(/from\s+['"](\.\/[^'"]+)\.ts['"]/g, "from '$1'");
+          await fs.writeFile(mainTsxPath, mainContent, 'utf-8');
+        }
+      }
     }
 
     // Copy public directory (for config.json and other static assets)

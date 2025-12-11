@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export async function generateProject(targetPath, answers) {
-  let { template, cssFramework, componentLibrary } = answers;
+  let { template, cssFramework, componentLibrary, useRedux } = answers;
   
   // Dashboard and Landing templates require Tailwind CSS
   // Auto-switch to Tailwind if user selected a different CSS framework
@@ -327,8 +327,211 @@ body {
       }
       // Note: shadcn is not added here as it requires separate initialization via CLI
       
-      // Save package.json with all dependencies (CSS framework + component library)
+      // Handle Redux setup
+      if (useRedux) {
+        console.log(chalk.blue('✅ Setting up Redux with Redux Thunk...'));
+        
+        // Add Redux dependencies
+        packageJson.dependencies['@reduxjs/toolkit'] = '^2.0.0';
+        packageJson.dependencies['react-redux'] = '^9.0.0';
+        
+        console.log(chalk.green('✅ Added Redux dependencies to package.json'));
+      }
+      
+      // Save package.json with all dependencies (CSS framework + component library + Redux)
       await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
+    }
+    
+    // Setup Redux store structure if Redux is selected
+    if (useRedux) {
+      console.log(chalk.blue('📁 Setting up Redux store structure...'));
+      
+      // Create store directory
+      const storeDir = path.join(targetSrcPath, 'store');
+      await fs.ensureDir(storeDir);
+      
+      // Create store configuration
+      const storeContent = `import { configureStore } from '@reduxjs/toolkit';
+import { useDispatch, useSelector, TypedUseSelectorHook } from 'react-redux';
+import exampleReducer from './slices/exampleSlice';
+
+export const store = configureStore({
+  reducer: {
+    example: exampleReducer,
+  },
+  // Redux Thunk is included by default in Redux Toolkit
+});
+
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;
+
+// Typed hooks for use in components
+export const useAppDispatch = () => useDispatch<AppDispatch>();
+export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
+`;
+      
+      await fs.writeFile(path.join(storeDir, 'store.ts'), storeContent, 'utf-8');
+      console.log(chalk.green('✅ Created store/store.ts'));
+      
+      // Create hooks file (alternative export)
+      const hooksContent = `// Re-export typed hooks for convenience
+export { useAppDispatch, useAppSelector } from './store';
+`;
+      
+      await fs.writeFile(path.join(storeDir, 'hooks.ts'), hooksContent, 'utf-8');
+      console.log(chalk.green('✅ Created store/hooks.ts'));
+      
+      // Create slices directory
+      const slicesDir = path.join(storeDir, 'slices');
+      await fs.ensureDir(slicesDir);
+      
+      // Create example slice
+      const exampleSliceContent = `import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+
+// Example async thunk
+export const fetchExampleData = createAsyncThunk(
+  'example/fetchData',
+  async (_, { rejectWithValue }) => {
+    try {
+      // Replace with your API call
+      const response = await fetch('https://api.example.com/data');
+      if (!response.ok) {
+        throw new Error('Failed to fetch data');
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      return rejectWithValue((error as Error).message);
+    }
+  }
+);
+
+interface ExampleState {
+  data: any;
+  loading: boolean;
+  error: string | null;
+}
+
+const initialState: ExampleState = {
+  data: null,
+  loading: false,
+  error: null,
+};
+
+const exampleSlice = createSlice({
+  name: 'example',
+  initialState,
+  reducers: {
+    // Add your synchronous reducers here
+    setData: (state, action: PayloadAction<any>) => {
+      state.data = action.payload;
+    },
+    clearError: (state) => {
+      state.error = null;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      // Handle fetchExampleData pending
+      .addCase(fetchExampleData.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      // Handle fetchExampleData fulfilled
+      .addCase(fetchExampleData.fulfilled, (state, action) => {
+        state.loading = false;
+        state.data = action.payload;
+      })
+      // Handle fetchExampleData rejected
+      .addCase(fetchExampleData.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+  },
+});
+
+export const { setData, clearError } = exampleSlice.actions;
+export default exampleSlice.reducer;
+`;
+      
+      await fs.writeFile(path.join(slicesDir, 'exampleSlice.ts'), exampleSliceContent, 'utf-8');
+      console.log(chalk.green('✅ Created store/slices/exampleSlice.ts'));
+      
+      // Update main.tsx to include Redux Provider
+      const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
+      if (await fs.pathExists(mainTsxPath)) {
+        let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+        
+        // Add Redux imports if not already present
+        if (!mainContent.includes('react-redux')) {
+          // Find the last import statement and add Redux imports after it
+          const importLines = mainContent.split('\n');
+          let lastImportIndex = -1;
+          for (let i = 0; i < importLines.length; i++) {
+            if (importLines[i].trim().startsWith('import ')) {
+              lastImportIndex = i;
+            }
+          }
+          
+          if (lastImportIndex !== -1) {
+            importLines.splice(lastImportIndex + 1, 0, 
+              "import { Provider } from 'react-redux'",
+              "import { store } from './store/store'"
+            );
+            mainContent = importLines.join('\n');
+          } else {
+            // If no imports found, add at the beginning
+            mainContent = "import { Provider } from 'react-redux'\n" +
+              "import { store } from './store/store'\n" +
+              mainContent;
+          }
+        }
+        
+        // Wrap the entire app with Redux Provider
+        // The structure is usually: ReactDOM.createRoot(...).render(<React.StrictMode>...</React.StrictMode>)
+        // We want: ReactDOM.createRoot(...).render(<Provider><React.StrictMode>...</React.StrictMode></Provider>)
+        
+        if (mainContent.includes('<React.StrictMode>')) {
+          // Wrap StrictMode with Provider
+          mainContent = mainContent.replace(
+            /(<React\.StrictMode>)/,
+            '<Provider store={store}>\n    $1'
+          );
+          mainContent = mainContent.replace(
+            /(<\/React\.StrictMode>)/,
+            '$1\n    </Provider>'
+          );
+        } else {
+          // If no StrictMode, find the first JSX element in render and wrap it
+          // This handles cases where StrictMode might not be present
+          const renderMatch = mainContent.match(/\.render\(\s*([^)]+)\)/);
+          if (renderMatch) {
+            // Try to wrap ConfigProvider or BrowserRouter or App
+            if (mainContent.includes('<ConfigProvider>')) {
+              mainContent = mainContent.replace(
+                /(<ConfigProvider>)/,
+                '<Provider store={store}>\n      $1'
+              );
+              mainContent = mainContent.replace(
+                /(<\/ConfigProvider>)/,
+                '$1\n    </Provider>'
+              );
+            } else if (mainContent.includes('<BrowserRouter>')) {
+              mainContent = mainContent.replace(
+                /(<BrowserRouter>)/,
+                '<Provider store={store}>\n      $1'
+              );
+              mainContent = mainContent.replace(
+                /(<\/BrowserRouter>)/,
+                '$1\n    </Provider>'
+              );
+            }
+          }
+        }
+        
+        await fs.writeFile(mainTsxPath, mainContent, 'utf-8');
+        console.log(chalk.green('✅ Updated main.tsx with Redux Provider'));
+      }
     }
     
     // Final verification before npm install
@@ -355,7 +558,14 @@ body {
     }
 
     console.log(chalk.blue('📦 Installing dependencies...'));
-    console.log(chalk.blue('   This will install all dependencies including sass (if selected)...'));
+    const dependencyList = [];
+    if (cssFramework === 'sass') dependencyList.push('sass');
+    if (useRedux) dependencyList.push('Redux Toolkit & React-Redux');
+    if (dependencyList.length > 0) {
+      console.log(chalk.blue(`   This will install all dependencies including ${dependencyList.join(', ')}...`));
+    } else {
+      console.log(chalk.blue('   This will install all dependencies...'));
+    }
     
     // Install dependencies
     await execa('npm', ['install'], {
@@ -411,6 +621,63 @@ body {
         if (!hasScssImport) {
           console.log(chalk.red('   ✗ SCSS import not found in main.tsx'));
           console.log(chalk.yellow('   → Update main.tsx to import "./index.scss" instead of "./index.css"'));
+        }
+      }
+    }
+    
+    // Verify Redux setup if Redux was selected
+    if (useRedux) {
+      console.log(chalk.blue('\n🔍 Verifying Redux setup...'));
+      
+      // Check if Redux packages were installed
+      const nodeModulesRedux = path.join(targetPath, 'node_modules', '@reduxjs', 'toolkit');
+      const reduxInstalled = await fs.pathExists(nodeModulesRedux);
+      
+      // Check package.json
+      const finalPackageJson = await fs.readJson(packageJsonPath);
+      const hasReduxInPackage = !!finalPackageJson.dependencies?.['@reduxjs/toolkit'] && 
+                                 !!finalPackageJson.dependencies?.['react-redux'];
+      
+      // Check store files
+      const storeFileExists = await fs.pathExists(path.join(targetSrcPath, 'store', 'store.ts'));
+      const exampleSliceExists = await fs.pathExists(path.join(targetSrcPath, 'store', 'slices', 'exampleSlice.ts'));
+      
+      // Check main.tsx for Provider
+      const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
+      let hasProvider = false;
+      if (await fs.pathExists(mainTsxPath)) {
+        const mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+        hasProvider = mainContent.includes('Provider') && mainContent.includes('store');
+      }
+      
+      if (reduxInstalled && hasReduxInPackage && storeFileExists && exampleSliceExists && hasProvider) {
+        console.log(chalk.green('✅ Redux is fully configured and ready to use!'));
+        console.log(chalk.green('   ✓ @reduxjs/toolkit and react-redux packages installed'));
+        console.log(chalk.green('   ✓ Store structure created'));
+        console.log(chalk.green('   ✓ Example slice with async thunk created'));
+        console.log(chalk.green('   ✓ Redux Provider added to main.tsx'));
+        console.log(chalk.blue('\n💡 Redux Thunk is included by default in Redux Toolkit'));
+        console.log(chalk.blue('   You can use createAsyncThunk for async actions'));
+        console.log(chalk.blue('   Use useAppDispatch and useAppSelector hooks in your components'));
+        console.log(chalk.blue('   Example: import { useAppDispatch, useAppSelector } from "./store/hooks"'));
+      } else {
+        console.log(chalk.yellow('⚠️  Redux setup verification issues:'));
+        if (!reduxInstalled) {
+          console.log(chalk.red('   ✗ Redux packages not found in node_modules'));
+          console.log(chalk.yellow('   → Try running: npm install @reduxjs/toolkit react-redux'));
+        }
+        if (!hasReduxInPackage) {
+          console.log(chalk.red('   ✗ Redux missing from package.json'));
+        }
+        if (!storeFileExists) {
+          console.log(chalk.red('   ✗ store/store.ts file not found'));
+        }
+        if (!exampleSliceExists) {
+          console.log(chalk.red('   ✗ store/slices/exampleSlice.ts file not found'));
+        }
+        if (!hasProvider) {
+          console.log(chalk.red('   ✗ Redux Provider not found in main.tsx'));
+          console.log(chalk.yellow('   → Manually wrap your app with <Provider store={store}>'));
         }
       }
     }

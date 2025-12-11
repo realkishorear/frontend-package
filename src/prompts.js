@@ -9,7 +9,8 @@ const logos = {
   mui: '🎨',
   antd: '🐜',
   shadcn: '✨',
-  none: '🚫'
+  none: '🚫',
+  redux: '🔄'
 };
 
 export async function askQuestions() {
@@ -92,11 +93,22 @@ export async function askQuestions() {
     }
   ]);
 
+  // Fourth question: Redux (with Thunk)
+  const reduxAnswer = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'useRedux',
+      message: chalk.cyan.bold('\nDo you want to use Redux with Redux Thunk for state management?'),
+      default: false
+    }
+  ]);
+
   // Combine all answers
   return {
     ...templateAnswer,
     ...cssAnswer,
-    ...componentAnswer
+    ...componentAnswer,
+    ...reduxAnswer
   };
 }
 

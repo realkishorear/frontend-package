@@ -10,7 +10,8 @@ const logos = {
   antd: '🐜',
   shadcn: '✨',
   none: '🚫',
-  redux: '🔄'
+  redux: '🔄',
+  reactQuery: '🔍'
 };
 
 export async function askQuestions() {
@@ -103,12 +104,23 @@ export async function askQuestions() {
     }
   ]);
 
+  // Fifth question: React Query (TanStack Query)
+  const reactQueryAnswer = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'useReactQuery',
+      message: chalk.cyan.bold('\nDo you want to use React Query (TanStack Query) for data fetching?'),
+      default: false
+    }
+  ]);
+
   // Combine all answers
   return {
     ...templateAnswer,
     ...cssAnswer,
     ...componentAnswer,
-    ...reduxAnswer
+    ...reduxAnswer,
+    ...reactQueryAnswer
   };
 }
 

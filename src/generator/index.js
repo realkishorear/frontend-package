@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export async function generateProject(targetPath, answers) {
-  let { template, cssFramework, componentLibrary, useRedux } = answers;
+  let { template, cssFramework, componentLibrary, useRedux, useReactQuery } = answers;
   
   // Dashboard and Landing templates require Tailwind CSS
   // Auto-switch to Tailwind if user selected a different CSS framework
@@ -338,7 +338,17 @@ body {
         console.log(chalk.green('✅ Added Redux dependencies to package.json'));
       }
       
-      // Save package.json with all dependencies (CSS framework + component library + Redux)
+      // Handle React Query setup
+      if (useReactQuery) {
+        console.log(chalk.blue('✅ Setting up React Query (TanStack Query)...'));
+        
+        // Add React Query dependencies
+        packageJson.dependencies['@tanstack/react-query'] = '^5.17.0';
+        
+        console.log(chalk.green('✅ Added React Query dependencies to package.json'));
+      }
+      
+      // Save package.json with all dependencies (CSS framework + component library + Redux + React Query)
       await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
     }
     
@@ -534,6 +544,157 @@ export default exampleSlice.reducer;
       }
     }
     
+    // Setup React Query if selected
+    if (useReactQuery) {
+      console.log(chalk.blue('📁 Setting up React Query structure...'));
+      
+      // Create lib or hooks directory for React Query setup
+      const libDir = path.join(targetSrcPath, 'lib');
+      await fs.ensureDir(libDir);
+      
+      // Create QueryClient configuration
+      const queryClientContent = `import { QueryClient } from '@tanstack/react-query';
+
+// Create a client with default options
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Stale time: 5 minutes
+      staleTime: 1000 * 60 * 5,
+      // Cache time: 10 minutes
+      gcTime: 1000 * 60 * 10,
+      // Retry failed requests once
+      retry: 1,
+      // Refetch on window focus
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+`;
+      
+      await fs.writeFile(path.join(libDir, 'queryClient.ts'), queryClientContent, 'utf-8');
+      console.log(chalk.green('✅ Created lib/queryClient.ts'));
+      
+      // Create hooks directory for example queries
+      const hooksDir = path.join(targetSrcPath, 'hooks');
+      await fs.ensureDir(hooksDir);
+      
+      // Create example query hook
+      const exampleQueryContent = `import { useQuery } from '@tanstack/react-query';
+
+// Example: Fetch data from an API
+export const useExampleData = () => {
+  return useQuery({
+    queryKey: ['exampleData'],
+    queryFn: async () => {
+      // Replace with your API endpoint
+      const response = await fetch('https://api.example.com/data');
+      if (!response.ok) {
+        throw new Error('Failed to fetch data');
+      }
+      return response.json();
+    },
+  });
+};
+
+// Example: Fetch data with parameters
+export const useExampleDataById = (id: string) => {
+  return useQuery({
+    queryKey: ['exampleData', id],
+    queryFn: async () => {
+      const response = await fetch(\`https://api.example.com/data/\${id}\`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch data');
+      }
+      return response.json();
+    },
+    enabled: !!id, // Only run query if id is provided
+  });
+};
+`;
+      
+      await fs.writeFile(path.join(hooksDir, 'useExampleQuery.ts'), exampleQueryContent, 'utf-8');
+      console.log(chalk.green('✅ Created hooks/useExampleQuery.ts'));
+      
+      // Update main.tsx to include QueryClientProvider
+      const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
+      if (await fs.pathExists(mainTsxPath)) {
+        let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+        
+        // Add React Query imports if not already present
+        if (!mainContent.includes('@tanstack/react-query')) {
+          // Find the last import statement and add React Query imports after it
+          const importLines = mainContent.split('\n');
+          let lastImportIndex = -1;
+          for (let i = 0; i < importLines.length; i++) {
+            if (importLines[i].trim().startsWith('import ')) {
+              lastImportIndex = i;
+            }
+          }
+          
+          if (lastImportIndex !== -1) {
+            importLines.splice(lastImportIndex + 1, 0, 
+              "import { QueryClientProvider } from '@tanstack/react-query'",
+              "import { queryClient } from './lib/queryClient'"
+            );
+            mainContent = importLines.join('\n');
+          } else {
+            // If no imports found, add at the beginning
+            mainContent = "import { QueryClientProvider } from '@tanstack/react-query'\n" +
+              "import { queryClient } from './lib/queryClient'\n" +
+              mainContent;
+          }
+        }
+        
+        // Wrap the app with QueryClientProvider
+        // It should wrap inside Provider if Redux is also selected, or wrap the outermost element
+        if (mainContent.includes('<Provider store={store}>')) {
+          // If Redux Provider exists, wrap inside it
+          mainContent = mainContent.replace(
+            /(<Provider store={store}>)/,
+            '$1\n      <QueryClientProvider client={queryClient}>'
+          );
+          mainContent = mainContent.replace(
+            /(<\/Provider>)/,
+            '</QueryClientProvider>\n    $1'
+          );
+        } else if (mainContent.includes('<React.StrictMode>')) {
+          // Wrap StrictMode with QueryClientProvider
+          mainContent = mainContent.replace(
+            /(<React\.StrictMode>)/,
+            '<QueryClientProvider client={queryClient}>\n    $1'
+          );
+          mainContent = mainContent.replace(
+            /(<\/React\.StrictMode>)/,
+            '$1\n    </QueryClientProvider>'
+          );
+        } else if (mainContent.includes('<ConfigProvider>')) {
+          // Wrap ConfigProvider with QueryClientProvider
+          mainContent = mainContent.replace(
+            /(<ConfigProvider>)/,
+            '<QueryClientProvider client={queryClient}>\n      $1'
+          );
+          mainContent = mainContent.replace(
+            /(<\/ConfigProvider>)/,
+            '$1\n    </QueryClientProvider>'
+          );
+        } else if (mainContent.includes('<BrowserRouter>')) {
+          // Wrap BrowserRouter with QueryClientProvider
+          mainContent = mainContent.replace(
+            /(<BrowserRouter>)/,
+            '<QueryClientProvider client={queryClient}>\n      $1'
+          );
+          mainContent = mainContent.replace(
+            /(<\/BrowserRouter>)/,
+            '$1\n    </QueryClientProvider>'
+          );
+        }
+        
+        await fs.writeFile(mainTsxPath, mainContent, 'utf-8');
+        console.log(chalk.green('✅ Updated main.tsx with QueryClientProvider'));
+      }
+    }
+    
     // Final verification before npm install
     if (cssFramework === 'sass') {
       const finalPackageJson = await fs.readJson(packageJsonPath);
@@ -561,6 +722,7 @@ export default exampleSlice.reducer;
     const dependencyList = [];
     if (cssFramework === 'sass') dependencyList.push('sass');
     if (useRedux) dependencyList.push('Redux Toolkit & React-Redux');
+    if (useReactQuery) dependencyList.push('React Query (TanStack Query)');
     if (dependencyList.length > 0) {
       console.log(chalk.blue(`   This will install all dependencies including ${dependencyList.join(', ')}...`));
     } else {
@@ -678,6 +840,62 @@ export default exampleSlice.reducer;
         if (!hasProvider) {
           console.log(chalk.red('   ✗ Redux Provider not found in main.tsx'));
           console.log(chalk.yellow('   → Manually wrap your app with <Provider store={store}>'));
+        }
+      }
+    }
+    
+    // Verify React Query setup if React Query was selected
+    if (useReactQuery) {
+      console.log(chalk.blue('\n🔍 Verifying React Query setup...'));
+      
+      // Check if React Query package was installed
+      const nodeModulesReactQuery = path.join(targetPath, 'node_modules', '@tanstack', 'react-query');
+      const reactQueryInstalled = await fs.pathExists(nodeModulesReactQuery);
+      
+      // Check package.json
+      const finalPackageJson = await fs.readJson(packageJsonPath);
+      const hasReactQueryInPackage = !!finalPackageJson.dependencies?.['@tanstack/react-query'];
+      
+      // Check React Query files
+      const queryClientExists = await fs.pathExists(path.join(targetSrcPath, 'lib', 'queryClient.ts'));
+      const exampleQueryExists = await fs.pathExists(path.join(targetSrcPath, 'hooks', 'useExampleQuery.ts'));
+      
+      // Check main.tsx for QueryClientProvider
+      const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
+      let hasQueryClientProvider = false;
+      if (await fs.pathExists(mainTsxPath)) {
+        const mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+        hasQueryClientProvider = mainContent.includes('QueryClientProvider') && mainContent.includes('queryClient');
+      }
+      
+      if (reactQueryInstalled && hasReactQueryInPackage && queryClientExists && exampleQueryExists && hasQueryClientProvider) {
+        console.log(chalk.green('✅ React Query is fully configured and ready to use!'));
+        console.log(chalk.green('   ✓ @tanstack/react-query package installed'));
+        console.log(chalk.green('   ✓ QueryClient configured'));
+        console.log(chalk.green('   ✓ Example query hooks created'));
+        console.log(chalk.green('   ✓ QueryClientProvider added to main.tsx'));
+        console.log(chalk.blue('\n💡 React Query provides powerful data fetching capabilities'));
+        console.log(chalk.blue('   Use useQuery, useMutation, and other hooks for data management'));
+        console.log(chalk.blue('   Example: import { useExampleData } from "./hooks/useExampleQuery"'));
+        console.log(chalk.blue('   Check the example hooks for usage patterns'));
+      } else {
+        console.log(chalk.yellow('⚠️  React Query setup verification issues:'));
+        if (!reactQueryInstalled) {
+          console.log(chalk.red('   ✗ React Query package not found in node_modules'));
+          console.log(chalk.yellow('   → Try running: npm install @tanstack/react-query'));
+        }
+        if (!hasReactQueryInPackage) {
+          console.log(chalk.red('   ✗ React Query missing from package.json'));
+        }
+        if (!queryClientExists) {
+          console.log(chalk.red('   ✗ lib/queryClient.ts file not found'));
+        }
+        if (!exampleQueryExists) {
+          console.log(chalk.red('   ✗ hooks/useExampleQuery.ts file not found'));
+        }
+        if (!hasQueryClientProvider) {
+          console.log(chalk.red('   ✗ QueryClientProvider not found in main.tsx'));
+          console.log(chalk.yellow('   → Manually wrap your app with <QueryClientProvider client={queryClient}>'));
         }
       }
     }

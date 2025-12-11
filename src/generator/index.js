@@ -159,35 +159,42 @@ export default App
           scssContent = scssContent.trim();
         }
         
-        // If empty or only had Tailwind, add basic SCSS structure
-        // (CSS is valid SCSS, so this will work fine)
+        // If empty or only had Tailwind, add basic SCSS structure with SCSS features
         if (!scssContent || scssContent.trim().length === 0) {
           scssContent = `// Main stylesheet
 // This file will be compiled to CSS by Vite
 
+// SCSS Variables
+$font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  sans-serif;
+
+// Reset styles
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+// Base styles
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: $font-family-base;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+// Add your SCSS styles below
 `;
         }
         
-        // Remove CSS file first (if it exists) to avoid conflicts
+        // Ensure SCSS file is created - remove CSS file first (if it exists) to avoid conflicts
         if (await fs.pathExists(cssPath)) {
           await fs.remove(cssPath);
           console.log(chalk.blue(`🗑️  Removed old ${path.basename(cssPath)}`));
         }
         
-        // Write SCSS file
+        // Write SCSS file - ensure it's always created
+        await fs.ensureDir(path.dirname(scssPath));
         await fs.writeFile(scssPath, scssContent, 'utf-8');
         
         // Verify SCSS file was created and has content

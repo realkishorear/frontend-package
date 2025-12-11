@@ -13,7 +13,12 @@ const logos = {
   redux: '🔄',
   reactQuery: '🔍',
   logger: '📝',
-  router: '🛣️'
+  router: '🛣️',
+  vite: '⚡',
+  webpack: '📦',
+  parcel: '📮',
+  rollup: '🎯',
+  esbuild: '🚀'
 };
 
 export async function askQuestions() {
@@ -31,7 +36,44 @@ export async function askQuestions() {
     }
   ]);
 
-  // Second question: CSS Framework
+  // Second question: Bundler
+  const bundlerAnswer = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'bundler',
+      message: chalk.cyan.bold('\nChoose a bundler:'),
+      choices: [
+        { 
+          name: `${logos.vite} Vite ${chalk.gray('(Recommended - Fast & Modern)')}`, 
+          value: 'vite',
+          short: 'Vite'
+        },
+        { 
+          name: `${logos.webpack} Webpack ${chalk.gray('(Most Popular - Flexible)')}`, 
+          value: 'webpack',
+          short: 'Webpack'
+        },
+        { 
+          name: `${logos.parcel} Parcel ${chalk.gray('(Zero Config - Fast)')}`, 
+          value: 'parcel',
+          short: 'Parcel'
+        },
+        { 
+          name: `${logos.rollup} Rollup ${chalk.gray('(Great for Libraries)')}`, 
+          value: 'rollup',
+          short: 'Rollup'
+        },
+        { 
+          name: `${logos.esbuild} esbuild ${chalk.gray('(Extremely Fast)')}`, 
+          value: 'esbuild',
+          short: 'esbuild'
+        }
+      ],
+      default: 'vite'
+    }
+  ]);
+
+  // Third question: CSS Framework
   const cssAnswer = await inquirer.prompt([
     {
       type: 'list',
@@ -58,7 +100,7 @@ export async function askQuestions() {
     }
   ]);
 
-  // Third question: Component Library (conditional based on CSS framework)
+  // Fourth question: Component Library (conditional based on CSS framework)
   const componentChoices = [
     { 
       name: `${logos.mui} Material UI`, 
@@ -96,7 +138,7 @@ export async function askQuestions() {
     }
   ]);
 
-  // Fourth question: Redux (with Thunk)
+  // Fifth question: Redux (with Thunk)
   const reduxAnswer = await inquirer.prompt([
     {
       type: 'confirm',
@@ -106,17 +148,17 @@ export async function askQuestions() {
     }
   ]);
 
-  // Fifth question: React Query (TanStack Query)
+  // Sixth question: TanStack Query
   const reactQueryAnswer = await inquirer.prompt([
     {
       type: 'confirm',
       name: 'useReactQuery',
-      message: chalk.cyan.bold('\nDo you want to use React Query (TanStack Query) for data fetching?'),
+      message: chalk.cyan.bold('\nDo you want to use TanStack Query for data fetching?'),
       default: false
     }
   ]);
 
-  // Sixth question: Logger (loglevel)
+  // Seventh question: Logger (loglevel)
   const loggerAnswer = await inquirer.prompt([
     {
       type: 'confirm',
@@ -126,7 +168,7 @@ export async function askQuestions() {
     }
   ]);
 
-  // Seventh question: Routing type
+  // Eighth question: Routing type
   const routingAnswer = await inquirer.prompt([
     {
       type: 'list',
@@ -151,6 +193,7 @@ export async function askQuestions() {
   // Combine all answers
   return {
     ...templateAnswer,
+    ...bundlerAnswer,
     ...cssAnswer,
     ...componentAnswer,
     ...reduxAnswer,

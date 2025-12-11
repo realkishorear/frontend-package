@@ -7,8 +7,330 @@ import chalk from 'chalk';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+async function configureBundler(targetPath, bundler, routingType) {
+  const packageJsonPath = path.join(targetPath, 'package.json');
+  let packageJson = {};
+  if (await fs.pathExists(packageJsonPath)) {
+    packageJson = await fs.readJson(packageJsonPath);
+  }
+
+  // Remove Vite-specific dependencies if not using Vite
+  if (bundler !== 'vite') {
+    delete packageJson.devDependencies?.['vite'];
+    delete packageJson.devDependencies?.['@vitejs/plugin-react'];
+  }
+
+  // Remove React Router v7+ specific scripts if using v6
+  if (routingType === 'v6' && packageJson.scripts) {
+    if (packageJson.scripts.dev === 'react-router dev') {
+      delete packageJson.scripts.dev;
+      delete packageJson.scripts.build;
+      delete packageJson.scripts.preview;
+      delete packageJson.scripts.typecheck;
+    }
+  }
+
+    switch (bundler) {
+    case 'vite':
+      // Vite configuration
+      const viteConfigPath = path.join(targetPath, 'vite.config.ts');
+      if (routingType === 'v7') {
+        // React Router v7+ config will be written later in the code
+        // Just ensure vite is in dependencies here
+        if (!packageJson.devDependencies) {
+          packageJson.devDependencies = {};
+        }
+        packageJson.devDependencies['vite'] = '^5.0.8';
+        packageJson.devDependencies['@vitejs/plugin-react'] = '^4.2.1';
+        // Scripts will be updated by React Router v7+ setup
+      } else {
+        // Standard Vite config
+        const viteConfigContent = `import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+})
+`;
+        await fs.writeFile(viteConfigPath, viteConfigContent, 'utf-8');
+        
+        if (!packageJson.devDependencies) {
+          packageJson.devDependencies = {};
+        }
+        packageJson.devDependencies['vite'] = '^5.0.8';
+        packageJson.devDependencies['@vitejs/plugin-react'] = '^4.2.1';
+        
+        if (!packageJson.scripts) {
+          packageJson.scripts = {};
+        }
+        packageJson.scripts['dev'] = 'vite';
+        packageJson.scripts['build'] = 'tsc && vite build';
+        packageJson.scripts['preview'] = 'vite preview';
+      }
+      console.log(chalk.green('✅ Configured Vite'));
+      break;
+
+    case 'webpack':
+      // Webpack configuration
+      const webpackConfigPath = path.join(targetPath, 'webpack.config.js');
+      const webpackConfigContent = `const path = require('path');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+
+module.exports = {
+  entry: './src/main.tsx',
+  mode: process.env.NODE_ENV || 'development',
+  module: {
+    rules: [
+      {
+        test: /\\.tsx?$/,
+        use: 'ts-loader',
+        exclude: /node_modules/,
+      },
+      {
+        test: /\\.css$/i,
+        use: ['style-loader', 'css-loader'],
+      },
+      {
+        test: /\\.(png|jpe?g|gif|svg)$/i,
+        type: 'asset/resource',
+      },
+    ],
+  },
+  resolve: {
+    extensions: ['.tsx', '.ts', '.js'],
+  },
+  output: {
+    filename: 'bundle.[contenthash].js',
+    path: path.resolve(__dirname, 'dist'),
+    clean: true,
+  },
+  plugins: [
+    new HtmlWebpackPlugin({
+      template: './index.html',
+    }),
+  ],
+  devServer: {
+    static: './dist',
+    port: 3000,
+    hot: true,
+    open: true,
+  },
+};
+`;
+      await fs.writeFile(webpackConfigPath, webpackConfigContent, 'utf-8');
+      
+      if (!packageJson.devDependencies) {
+        packageJson.devDependencies = {};
+      }
+      packageJson.devDependencies['webpack'] = '^5.89.0';
+      packageJson.devDependencies['webpack-cli'] = '^5.1.4';
+      packageJson.devDependencies['webpack-dev-server'] = '^4.15.1';
+      packageJson.devDependencies['html-webpack-plugin'] = '^5.5.3';
+      packageJson.devDependencies['ts-loader'] = '^9.5.1';
+      packageJson.devDependencies['style-loader'] = '^3.3.3';
+      packageJson.devDependencies['css-loader'] = '^6.8.1';
+      
+      if (!packageJson.scripts) {
+        packageJson.scripts = {};
+      }
+      packageJson.scripts['dev'] = 'webpack serve';
+      packageJson.scripts['build'] = 'tsc && webpack --mode production';
+      packageJson.scripts['preview'] = 'webpack serve --mode production';
+      
+      console.log(chalk.green('✅ Configured Webpack'));
+      break;
+
+    case 'parcel':
+      // Parcel configuration (zero config, but we can add .parcelrc)
+      const parcelRcPath = path.join(targetPath, '.parcelrc');
+      const parcelRcContent = `{
+  "extends": "@parcel/config-default",
+  "transformers": {
+    "*.{ts,tsx}": ["@parcel/transformer-typescript-tsc"]
+  }
+}
+`;
+      await fs.writeFile(parcelRcPath, parcelRcContent, 'utf-8');
+      
+      if (!packageJson.devDependencies) {
+        packageJson.devDependencies = {};
+      }
+      packageJson.devDependencies['parcel'] = '^2.12.0';
+      packageJson.devDependencies['@parcel/config-default'] = '^2.12.0';
+      packageJson.devDependencies['@parcel/transformer-typescript-tsc'] = '^2.12.0';
+      
+      if (!packageJson.scripts) {
+        packageJson.scripts = {};
+      }
+      packageJson.scripts['dev'] = 'parcel index.html';
+      packageJson.scripts['build'] = 'tsc && parcel build index.html';
+      packageJson.scripts['preview'] = 'parcel serve dist/index.html';
+      
+      console.log(chalk.green('✅ Configured Parcel'));
+      break;
+
+    case 'rollup':
+      // Rollup configuration
+      const rollupConfigPath = path.join(targetPath, 'rollup.config.js');
+      const rollupConfigContent = `import resolve from '@rollup/plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
+import typescript from '@rollup/plugin-typescript';
+import { terser } from 'rollup-plugin-terser';
+import html from '@rollup/plugin-html';
+import serve from 'rollup-plugin-serve';
+import livereload from 'rollup-plugin-livereload';
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+export default {
+  input: 'src/main.tsx',
+  output: {
+    file: 'dist/bundle.js',
+    format: 'iife',
+    sourcemap: !isProduction,
+  },
+  plugins: [
+    resolve({
+      browser: true,
+      extensions: ['.ts', '.tsx', '.js', '.jsx'],
+    }),
+    commonjs(),
+    typescript({
+      tsconfig: './tsconfig.json',
+    }),
+    html({
+      template: 'index.html',
+    }),
+    !isProduction && serve({
+      open: true,
+      contentBase: 'dist',
+      port: 3000,
+    }),
+    !isProduction && livereload('dist'),
+    isProduction && terser(),
+  ].filter(Boolean),
+};
+`;
+      await fs.writeFile(rollupConfigPath, rollupConfigContent, 'utf-8');
+      
+      if (!packageJson.devDependencies) {
+        packageJson.devDependencies = {};
+      }
+      packageJson.devDependencies['rollup'] = '^4.6.1';
+      packageJson.devDependencies['@rollup/plugin-node-resolve'] = '^15.2.3';
+      packageJson.devDependencies['@rollup/plugin-commonjs'] = '^25.0.7';
+      packageJson.devDependencies['@rollup/plugin-typescript'] = '^11.1.5';
+      packageJson.devDependencies['rollup-plugin-terser'] = '^7.0.2';
+      packageJson.devDependencies['@rollup/plugin-html'] = '^1.0.2';
+      packageJson.devDependencies['rollup-plugin-serve'] = '^2.0.2';
+      packageJson.devDependencies['rollup-plugin-livereload'] = '^2.0.2';
+      
+      if (!packageJson.scripts) {
+        packageJson.scripts = {};
+      }
+      packageJson.scripts['dev'] = 'rollup -c --watch';
+      packageJson.scripts['build'] = 'tsc && NODE_ENV=production rollup -c';
+      packageJson.scripts['preview'] = 'rollup -c --watch';
+      
+      console.log(chalk.green('✅ Configured Rollup'));
+      break;
+
+    case 'esbuild':
+      // esbuild configuration
+      const esbuildConfigPath = path.join(targetPath, 'esbuild.config.js');
+      const esbuildConfigContent = `import * as esbuild from 'esbuild';
+import { readFileSync, writeFileSync } from 'fs';
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+const config = {
+  entryPoints: ['src/main.tsx'],
+  bundle: true,
+  outdir: 'dist',
+  format: 'iife',
+  platform: 'browser',
+  target: 'es2020',
+  sourcemap: !isProduction,
+  minify: isProduction,
+  loader: {
+    '.ts': 'ts',
+    '.tsx': 'tsx',
+  },
+  plugins: [
+    {
+      name: 'html',
+      setup(build) {
+        build.onEnd(() => {
+          const html = readFileSync('index.html', 'utf-8');
+          const output = html.replace(
+            /<script[^>]*src="[^"]*main\\.tsx"[^>]*><\\/script>/,
+            '<script src="main.js"></script>'
+          );
+          writeFileSync('dist/index.html', output);
+        });
+      },
+    },
+  ],
+};
+
+(async () => {
+  if (isProduction) {
+    await esbuild.build(config).catch(() => process.exit(1));
+  } else {
+    const ctx = await esbuild.context(config);
+    await ctx.watch();
+    await ctx.serve({
+      servedir: 'dist',
+      port: 3000,
+    });
+  }
+})();
+`;
+      await fs.writeFile(esbuildConfigPath, esbuildConfigContent, 'utf-8');
+      
+      if (!packageJson.devDependencies) {
+        packageJson.devDependencies = {};
+      }
+      packageJson.devDependencies['esbuild'] = '^0.19.8';
+      
+      if (!packageJson.scripts) {
+        packageJson.scripts = {};
+      }
+      packageJson.scripts['dev'] = 'node esbuild.config.js';
+      packageJson.scripts['build'] = 'tsc && NODE_ENV=production node esbuild.config.js';
+      packageJson.scripts['preview'] = 'node esbuild.config.js';
+      
+      console.log(chalk.green('✅ Configured esbuild'));
+      break;
+
+    default:
+      console.log(chalk.yellow(`⚠️  Unknown bundler: ${bundler}, defaulting to Vite`));
+      // Fallback to Vite
+      const defaultViteConfigPath = path.join(targetPath, 'vite.config.ts');
+      const defaultViteConfigContent = `import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+})
+`;
+      await fs.writeFile(defaultViteConfigPath, defaultViteConfigContent, 'utf-8');
+  }
+
+  // Save updated package.json
+  await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
+}
+
 export async function generateProject(targetPath, answers) {
-  let { template, cssFramework, componentLibrary, useRedux, useReactQuery, useLogger, routingType } = answers;
+  let { template, bundler, cssFramework, componentLibrary, useRedux, useReactQuery, useLogger, routingType } = answers;
+  
+  // React Router v7+ requires Vite
+  if (routingType === 'v7' && bundler !== 'vite') {
+    console.log(chalk.yellow(`\n⚠️  Warning: React Router v7+ requires Vite as the bundler.`));
+    console.log(chalk.yellow(`   Automatically switching to Vite for proper routing support.\n`));
+    bundler = 'vite';
+  }
   
   // Dashboard and Landing templates require Tailwind CSS
   // Auto-switch to Tailwind if user selected a different CSS framework
@@ -28,10 +350,10 @@ export async function generateProject(targetPath, answers) {
 
     console.log(chalk.blue('📁 Copying base files...'));
     
-    // Copy base files (package.json, vite.config, tsconfig, etc.)
+    // Copy base files (package.json, tsconfig, etc.)
+    // Note: bundler config files will be created separately based on bundler choice
     const baseFiles = [
       'package.json',
-      'vite.config.ts',
       'tsconfig.json',
       'tsconfig.node.json',
       'index.html',
@@ -45,6 +367,10 @@ export async function generateProject(targetPath, answers) {
         await fs.copy(srcFile, path.join(targetPath, file));
       }
     }
+    
+    // Handle bundler-specific configuration
+    console.log(chalk.blue(`⚙️  Configuring ${bundler} bundler...`));
+    await configureBundler(targetPath, bundler, routingType);
 
     // Copy base src directory
     const baseSrcPath = path.join(basePath, 'src');

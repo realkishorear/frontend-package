@@ -44,27 +44,27 @@ export async function askQuestions() {
       message: chalk.cyan.bold('\nChoose a bundler:'),
       choices: [
         { 
-          name: `${logos.vite} Vite ${chalk.gray('(Recommended - Fast & Modern)')}`, 
+          name: `${logos.vite} Vite`, 
           value: 'vite',
           short: 'Vite'
         },
         { 
-          name: `${logos.webpack} Webpack ${chalk.gray('(Most Popular - Flexible)')}`, 
+          name: `${logos.webpack} Webpack`, 
           value: 'webpack',
           short: 'Webpack'
         },
         { 
-          name: `${logos.parcel} Parcel ${chalk.gray('(Zero Config - Fast)')}`, 
+          name: `${logos.parcel} Parcel`, 
           value: 'parcel',
           short: 'Parcel'
         },
         { 
-          name: `${logos.rollup} Rollup ${chalk.gray('(Great for Libraries)')}`, 
+          name: `${logos.rollup} Rollup`, 
           value: 'rollup',
           short: 'Rollup'
         },
         { 
-          name: `${logos.esbuild} esbuild ${chalk.gray('(Extremely Fast)')}`, 
+          name: `${logos.esbuild} esbuild`, 
           value: 'esbuild',
           short: 'esbuild'
         }

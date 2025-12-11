@@ -7,6 +7,53 @@ import chalk from 'chalk';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+async function createTypeScriptConfig(targetPath, bundler) {
+  const tsconfigPath = path.join(targetPath, 'tsconfig.json');
+  
+  // Base tsconfig options
+  const baseConfig = {
+    compilerOptions: {
+      target: "ES2020",
+      useDefineForClassFields: true,
+      lib: ["ES2020", "DOM", "DOM.Iterable"],
+      module: "ESNext",
+      skipLibCheck: true,
+      resolveJsonModule: true,
+      isolatedModules: true,
+      noEmit: true,
+      jsx: "react-jsx",
+      strict: true,
+      noFallthroughCasesInSwitch: true,
+    },
+    include: ["src"],
+    references: [{ path: "./tsconfig.node.json" }]
+  };
+
+  // Bundler-specific configurations
+  if (bundler === 'vite') {
+    // Vite-specific settings
+    baseConfig.compilerOptions.moduleResolution = "bundler";
+    baseConfig.compilerOptions.allowImportingTsExtensions = true;
+    // Keep strict unused checks for Vite (can be relaxed if needed)
+    baseConfig.compilerOptions.noUnusedLocals = false;
+    baseConfig.compilerOptions.noUnusedParameters = false;
+    // Add vite/client types for import.meta.env support
+    baseConfig.compilerOptions.types = ["vite/client"];
+  } else {
+    // For other bundlers (webpack, parcel, rollup, esbuild)
+    baseConfig.compilerOptions.moduleResolution = "node";
+    baseConfig.compilerOptions.allowImportingTsExtensions = false;
+    // Relax unused checks for non-Vite bundlers to avoid build errors
+    baseConfig.compilerOptions.noUnusedLocals = false;
+    baseConfig.compilerOptions.noUnusedParameters = false;
+    // Add node types for process.env support
+    baseConfig.compilerOptions.types = ["node"];
+  }
+
+  await fs.writeJson(tsconfigPath, baseConfig, { spaces: 2 });
+  console.log(chalk.green(`✅ Created tsconfig.json for ${bundler}`));
+}
+
 async function configureBundler(targetPath, bundler, routingType) {
   const packageJsonPath = path.join(targetPath, 'package.json');
   let packageJson = {};
@@ -130,6 +177,7 @@ module.exports = {
       packageJson.devDependencies['ts-loader'] = '^9.5.1';
       packageJson.devDependencies['style-loader'] = '^3.3.3';
       packageJson.devDependencies['css-loader'] = '^6.8.1';
+      packageJson.devDependencies['@types/node'] = '^20.10.0';
       
       if (!packageJson.scripts) {
         packageJson.scripts = {};
@@ -159,6 +207,7 @@ module.exports = {
       packageJson.devDependencies['parcel'] = '^2.12.0';
       packageJson.devDependencies['@parcel/config-default'] = '^2.12.0';
       packageJson.devDependencies['@parcel/transformer-typescript-tsc'] = '^2.12.0';
+      packageJson.devDependencies['@types/node'] = '^20.10.0';
       
       if (!packageJson.scripts) {
         packageJson.scripts = {};
@@ -225,6 +274,7 @@ export default {
       packageJson.devDependencies['@rollup/plugin-html'] = '^1.0.2';
       packageJson.devDependencies['rollup-plugin-serve'] = '^2.0.2';
       packageJson.devDependencies['rollup-plugin-livereload'] = '^2.0.2';
+      packageJson.devDependencies['@types/node'] = '^20.10.0';
       
       if (!packageJson.scripts) {
         packageJson.scripts = {};
@@ -293,6 +343,7 @@ const config = {
         packageJson.devDependencies = {};
       }
       packageJson.devDependencies['esbuild'] = '^0.19.8';
+      packageJson.devDependencies['@types/node'] = '^20.10.0';
       
       if (!packageJson.scripts) {
         packageJson.scripts = {};
@@ -350,11 +401,10 @@ export async function generateProject(targetPath, answers) {
 
     console.log(chalk.blue('📁 Copying base files...'));
     
-    // Copy base files (package.json, tsconfig, etc.)
-    // Note: bundler config files will be created separately based on bundler choice
+    // Copy base files (package.json, etc.)
+    // Note: bundler config files and tsconfig will be created separately based on bundler choice
     const baseFiles = [
       'package.json',
-      'tsconfig.json',
       'tsconfig.node.json',
       'index.html',
       'tailwind.config.js',
@@ -368,9 +418,12 @@ export async function generateProject(targetPath, answers) {
       }
     }
     
-    // Handle bundler-specific configuration
+    // Handle bundler-specific configuration (including tsconfig)
     console.log(chalk.blue(`⚙️  Configuring ${bundler} bundler...`));
     await configureBundler(targetPath, bundler, routingType);
+    
+    // Create bundler-appropriate tsconfig.json
+    await createTypeScriptConfig(targetPath, bundler);
 
     // Copy base src directory
     const baseSrcPath = path.join(basePath, 'src');
@@ -420,8 +473,7 @@ export async function generateProject(targetPath, answers) {
         const templateName = template === 'dashboard' ? 'Dashboard' : 'Landing';
         const templateImport = `import ${templateName} from './${templateName}'`;
         
-        const appContent = `import { Routes, Route } from 'react-router-dom'
-${templateImport}
+        const appContent = `${templateImport}
 
 function App() {
   return <${templateName} />
@@ -1366,8 +1418,11 @@ export const useExampleDataById = (id: string) => {
       const libDir = path.join(targetSrcPath, 'lib');
       await fs.ensureDir(libDir);
       
-      // Create logger configuration
-      const loggerContent = `import log from 'loglevel';
+      // Create logger configuration (bundler-aware)
+      let loggerContent;
+      if (bundler === 'vite') {
+        // Vite uses import.meta.env
+        loggerContent = `import log from 'loglevel';
 
 // Set default log level based on environment
 const isDevelopment = import.meta.env.DEV;
@@ -1400,6 +1455,42 @@ export const { trace, debug, info, warn, error } = log;
 // info('User logged in');
 // error('Failed to fetch data', error);
 `;
+      } else {
+        // Other bundlers use process.env.NODE_ENV
+        loggerContent = `import log from 'loglevel';
+
+// Set default log level based on environment
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isDevelopment) {
+  // In development, show all logs
+  log.setLevel('DEBUG');
+} else if (isProduction) {
+  // In production, only show warnings and errors
+  log.setLevel('WARN');
+} else {
+  // Default to info level
+  log.setLevel('INFO');
+}
+
+// Export configured logger
+export default log;
+
+// You can also export individual log methods for convenience
+export const { trace, debug, info, warn, error } = log;
+
+// Example usage:
+// import logger from './lib/logger';
+// logger.info('Application started');
+// logger.error('Something went wrong', error);
+// 
+// Or use individual methods:
+// import { info, error } from './lib/logger';
+// info('User logged in');
+// error('Failed to fetch data', error);
+`;
+      }
       
       await fs.writeFile(path.join(libDir, 'logger.ts'), loggerContent, 'utf-8');
       console.log(chalk.green('✅ Created lib/logger.ts'));

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import Card from '../components/Card'
 import Input from '../components/Input'
 import Button from '../components/Button'
@@ -22,13 +22,19 @@ function Settings() {
   const handleInputChange = (field: string, value: string | boolean) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.')
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent as keyof typeof prev],
-          [child]: value,
-        },
-      }))
+      setFormData(prev => {
+        const parentValue = prev[parent as keyof typeof prev]
+        if (typeof parentValue === 'object' && parentValue !== null && !Array.isArray(parentValue)) {
+          return {
+            ...prev,
+            [parent]: {
+              ...(parentValue as Record<string, any>),
+              [child]: value,
+            },
+          }
+        }
+        return prev
+      })
     } else {
       setFormData(prev => ({
         ...prev,

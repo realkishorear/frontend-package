@@ -1,4 +1,3 @@
-import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { 
   FiHome, 
@@ -9,8 +8,7 @@ import {
   FiFileText,
   FiMail,
   FiCalendar,
-  FiX,
-  FiMenu
+  FiX
 } from 'react-icons/fi'
 
 interface SidebarProps {

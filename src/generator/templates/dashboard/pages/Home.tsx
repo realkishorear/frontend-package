@@ -1,4 +1,3 @@
-import React from 'react'
 import { FiTrendingUp, FiUsers, FiDollarSign, FiShoppingCart } from 'react-icons/fi'
 import StatCard from '../components/StatCard'
 import Card from '../components/Card'

@@ -1,7 +1,5 @@
-import React from 'react'
-import { FiTrendingUp, FiTrendingDown, FiArrowUpRight, FiArrowDownRight } from 'react-icons/fi'
+import { FiTrendingUp, FiTrendingDown, FiArrowUpRight } from 'react-icons/fi'
 import Card from '../components/Card'
-import StatCard from '../components/StatCard'
 
 function Analytics() {
   const analyticsData = [

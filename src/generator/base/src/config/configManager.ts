@@ -7,7 +7,6 @@ class ConfigManager {
   private config: any = {};
   private callbacks: Set<ConfigChangeCallback> = new Set();
   private watchInterval: number | null = null;
-  private lastModified: number = 0;
   private configPath: string;
 
   constructor(configPath: string = '/config.json') {
@@ -30,15 +29,12 @@ class ConfigManager {
       
       if (response.ok) {
         const newConfig = await response.json();
-        const fileModified = response.headers.get('last-modified');
-        const modifiedTime = fileModified ? new Date(fileModified).getTime() : Date.now();
         
         // Check if config actually changed (deep comparison)
         const configChanged = JSON.stringify(this.config) !== JSON.stringify(newConfig);
         
         if (configChanged) {
           this.config = newConfig;
-          this.lastModified = modifiedTime;
           console.log('🔄 Config reloaded:', newConfig);
           this.notifyCallbacks();
         }

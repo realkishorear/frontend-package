@@ -3,22 +3,22 @@ import chalk from 'chalk';
 
 // Logo/Icon mappings
 const logos = {
-  tailwind: '⚡',
-  sass: '💎',
-  css: '🎨',
-  mui: '🎨',
-  antd: '🐜',
-  shadcn: '✨',
-  none: '🚫',
-  redux: '🔄',
-  reactQuery: '🔍',
-  logger: '📝',
-  router: '🛣️',
-  vite: '⚡',
+  tailwind: '📦',
+  sass: '📦',
+  css: '📦',
+  mui: '📦',
+  antd: '📦',
+  shadcn: '📦',
+  none: '📦',
+  redux: '📦',
+  reactQuery: '📦',
+  logger: '📦',
+  router: '📦',
+  vite: '📦',
   webpack: '📦',
-  parcel: '📮',
-  rollup: '🎯',
-  esbuild: '🚀'
+  parcel: '📦',
+  rollup: '📦',
+  esbuild: '📦'
 };
 
 export async function askQuestions() {
@@ -201,5 +201,5 @@ export async function askQuestions() {
     ...loggerAnswer,
     ...routingAnswer
   };
+  
 }
-

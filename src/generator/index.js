@@ -249,11 +249,11 @@ export default defineConfig({
 }
 
 export async function generateProject(targetPath, answers) {
-  let { template, bundler, cssFramework, componentLibrary, useRedux, useReactQuery, useLogger, routingType } = answers;
+  let { template, bundler, cssFramework, componentLibrary, useRedux, useReactQuery, useLogger, useAnimation, routingType } = answers;
   
   // React Router v7+ requires Vite
   if (routingType === 'v7' && bundler !== 'vite') {
-    console.log(chalk.yellow(`\n⚠️  Warning: React Router v7+ requires Vite as the bundler.`));
+    console.log(chalk.yellow(`\n⚠️ Warning: React Router v7+ requires Vite as the bundler.`));
     console.log(chalk.yellow(`   Automatically switching to Vite for proper routing support.\n`));
     bundler = 'vite';
   }
@@ -886,7 +886,17 @@ body {
         console.log(chalk.green('✅ Added loglevel dependency to package.json'));
       }
       
-      // Save package.json with all dependencies (CSS framework + component library + Redux + React Query + Logger)
+      // Handle Animation Library setup (Framer Motion)
+      if (useAnimation) {
+        console.log(chalk.blue('✅ Setting up Framer Motion...'));
+        
+        // Add Framer Motion dependency
+        packageJson.dependencies['framer-motion'] = '^10.16.16';
+        
+        console.log(chalk.green('✅ Added framer-motion dependency to package.json'));
+      }
+      
+      // Save package.json with all dependencies (CSS framework + component library + Redux + React Query + Logger + Animation)
       await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
     }
     
@@ -1428,6 +1438,98 @@ export const createLogger = (prefix: string) => {
       console.log(chalk.green('✅ Created utils/logger.ts'));
     }
     
+    // Setup Framer Motion if selected
+    if (useAnimation) {
+      console.log(chalk.blue('🎬 Setting up Framer Motion...'));
+      
+      // Create a hooks directory for animation utilities if it doesn't exist
+      const hooksDir = path.join(targetSrcPath, 'hooks');
+      await fs.ensureDir(hooksDir);
+      
+      // Create an example animation hook
+      const animationHookContent = `import { useAnimation, useInView } from 'framer-motion';
+import { useEffect, useRef } from 'react';
+
+/**
+ * Custom hook for scroll-triggered animations
+ * @param options - Animation options
+ * @returns Animation controls
+ */
+export const useScrollAnimation = (options = {}) => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, ...options });
+  const controls = useAnimation();
+
+  useEffect(() => {
+    if (isInView) {
+      controls.start('visible');
+    }
+  }, [isInView, controls]);
+
+  return { ref, controls, isInView };
+};
+
+/**
+ * Animation variants for common use cases
+ */
+export const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: 'easeOut',
+    },
+  },
+};
+
+export const fadeIn = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      duration: 0.5,
+      ease: 'easeOut',
+    },
+  },
+};
+
+export const scaleIn = {
+  hidden: { opacity: 0, scale: 0.8 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.4,
+      ease: 'easeOut',
+    },
+  },
+};
+
+// Example usage:
+// import { motion } from 'framer-motion';
+// import { useScrollAnimation, fadeInUp } from './hooks/useAnimation';
+//
+// function MyComponent() {
+//   const { ref, controls } = useScrollAnimation();
+//   return (
+//     <motion.div
+//       ref={ref}
+//       initial="hidden"
+//       animate={controls}
+//       variants={fadeInUp}
+//     >
+//       Content that animates on scroll
+//     </motion.div>
+//   );
+// }
+`;
+      
+      await fs.writeFile(path.join(hooksDir, 'useAnimation.ts'), animationHookContent, 'utf-8');
+      console.log(chalk.green('✅ Created hooks/useAnimation.ts with animation utilities'));
+    }
+    
     // Final verification before npm install
     if (cssFramework === 'sass') {
       const finalPackageJson = await fs.readJson(packageJsonPath);
@@ -1467,6 +1569,7 @@ export const createLogger = (prefix: string) => {
     if (useRedux) dependencyList.push('Redux Toolkit & React-Redux');
     if (useReactQuery) dependencyList.push('React Query (TanStack Query)');
     if (useLogger) dependencyList.push('loglevel');
+    if (useAnimation) dependencyList.push('Framer Motion');
     if (dependencyList.length > 0) {
       console.log(chalk.blue(`   This will install all dependencies including ${dependencyList.join(', ')}...`));
     } else {
@@ -1684,6 +1787,44 @@ export const createLogger = (prefix: string) => {
         }
         if (!loggerUtilExists) {
           console.log(chalk.red('   ✗ utils/logger.ts file not found'));
+        }
+      }
+    }
+    
+    // Verify Framer Motion setup if Animation was selected
+    if (useAnimation) {
+      console.log(chalk.blue('\n🎬 Verifying Framer Motion setup...'));
+      
+      // Check if framer-motion package was installed
+      const nodeModulesFramer = path.join(targetPath, 'node_modules', 'framer-motion');
+      const framerInstalled = await fs.pathExists(nodeModulesFramer);
+      
+      // Check package.json
+      const finalPackageJson = await fs.readJson(packageJsonPath);
+      const hasFramerInPackage = !!finalPackageJson.dependencies?.['framer-motion'];
+      
+      // Check animation hook file
+      const animationHookExists = await fs.pathExists(path.join(targetSrcPath, 'hooks', 'useAnimation.ts'));
+      
+      if (framerInstalled && hasFramerInPackage && animationHookExists) {
+        console.log(chalk.green('✅ Framer Motion is fully configured and ready to use!'));
+        console.log(chalk.green('   ✓ framer-motion package installed'));
+        console.log(chalk.green('   ✓ Animation utilities created'));
+        console.log(chalk.blue('\n💡 Framer Motion is ready to use in your components'));
+        console.log(chalk.blue('   Example: import { motion } from "framer-motion"'));
+        console.log(chalk.blue('   Example: import { useScrollAnimation, fadeInUp } from "./hooks/useAnimation"'));
+        console.log(chalk.blue('   See hooks/useAnimation.ts for animation utilities and examples'));
+      } else {
+        console.log(chalk.yellow('⚠️  Framer Motion setup verification issues:'));
+        if (!framerInstalled) {
+          console.log(chalk.red('   ✗ framer-motion package not found in node_modules'));
+          console.log(chalk.yellow('   → Try running: npm install framer-motion'));
+        }
+        if (!hasFramerInPackage) {
+          console.log(chalk.red('   ✗ framer-motion missing from package.json'));
+        }
+        if (!animationHookExists) {
+          console.log(chalk.red('   ✗ hooks/useAnimation.ts file not found'));
         }
       }
     }

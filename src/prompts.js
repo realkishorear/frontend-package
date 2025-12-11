@@ -13,6 +13,7 @@ const logos = {
   redux: '📦',
   reactQuery: '📦',
   logger: '📦',
+  animation: '📦',
   router: '📦',
   vite: '📦',
   webpack: '📦'
@@ -150,7 +151,17 @@ export async function askQuestions() {
     }
   ]);
 
-  // Eighth question: Routing type
+  // Eighth question: Animation Library (Framer Motion)
+  const animationAnswer = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'useAnimation',
+      message: chalk.cyan.bold('\nDo you want to use Framer Motion for animations?'),
+      default: false
+    }
+  ]);
+
+  // Ninth question: Routing type
   const routingAnswer = await inquirer.prompt([
     {
       type: 'list',
@@ -181,6 +192,7 @@ export async function askQuestions() {
     ...reduxAnswer,
     ...reactQueryAnswer,
     ...loggerAnswer,
+    ...animationAnswer,
     ...routingAnswer
   };
   

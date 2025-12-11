@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 async function fixProject() {
   const projectRoot = process.cwd();
   
-  console.log('🔧 Fixing TypeScript configuration for esbuild...\n');
+  console.log('Fixing TypeScript configuration for esbuild...\n');
   
   // 1. Update tsconfig.json
   const tsconfigPath = path.join(projectRoot, 'tsconfig.json');
@@ -69,6 +69,7 @@ async function fixProject() {
     } else {
       console.log('✅ @types/node already in package.json');
     }
+
   }
   
   console.log('\n✨ Fix complete!');

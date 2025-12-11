@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import terminalImage from 'terminal-image';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +28,66 @@ const iconFiles = {
   css: 'css.jpg',
   mui: 'mui.png',
   antd: 'antd.png'
+};
+
+// Helper to display icon in terminal
+const displayIcon = async (iconName) => {
+  try {
+    const iconPath = path.join(iconsDir, iconName);
+    if (fs.existsSync(iconPath)) {
+      const imageBuffer = fs.readFileSync(iconPath);
+      const image = await terminalImage.buffer(imageBuffer, {
+        width: '50%',
+        height: '50%'
+      });
+      console.log(image);
+      return true;
+    }
+  } catch (error) {
+    // Silently fail if terminal doesn't support images
+    return false;
+  }
+  return false;
+};
+
+// Helper to display icons for choices before prompt
+const displayIconsForChoices = async (choices, iconFilesMap) => {
+  const iconsToDisplay = [];
+  
+  for (const choice of choices) {
+    const iconFile = iconFilesMap[choice.value];
+    if (iconFile && iconExists(iconFile)) {
+      iconsToDisplay.push({ value: choice.value, icon: iconFile, name: choice.name });
+    }
+  }
+  
+  if (iconsToDisplay.length > 0) {
+    try {
+      // Try to display icons in a compact way
+      for (const item of iconsToDisplay) {
+        try {
+          const iconPath = path.join(iconsDir, item.icon);
+          const imageBuffer = fs.readFileSync(iconPath);
+          // Display smaller icons (15% size) to keep it compact
+          const image = await terminalImage.buffer(imageBuffer, {
+            width: '15%',
+            height: '15%'
+          });
+          // Extract just the name without emoji for cleaner display
+          const cleanName = item.name.replace(/[🖼️⚡💎🎨🐜✨🚫🔄🔍📝]/g, '').trim();
+          console.log(chalk.cyan(`\n${cleanName}:`));
+          console.log(image);
+        } catch (error) {
+          // Silently skip if image display fails for this specific icon
+        }
+      }
+      if (iconsToDisplay.length > 0) {
+        console.log('\n');
+      }
+    } catch (error) {
+      // Terminal might not support images, silently continue
+    }
+  }
 };
 
 // Helper to get icon indicator - shows icon emoji if icon file exists
@@ -68,28 +129,33 @@ export async function askQuestions() {
   ]);
 
   // Second question: CSS Framework
+  const cssChoices = [
+    { 
+      name: `${getIconIndicator('tailwind')} Tailwind ${chalk.gray('(Recommended)')}`, 
+      value: 'tailwind',
+      short: 'Tailwind'
+    },
+    { 
+      name: `${getIconIndicator('sass')} Sass`, 
+      value: 'sass',
+      short: 'Sass'
+    },
+    { 
+      name: `${getIconIndicator('css')} CSS`, 
+      value: 'css',
+      short: 'CSS'
+    }
+  ];
+  
+  // Display icons before showing the prompt
+  await displayIconsForChoices(cssChoices, iconFiles);
+  
   const cssAnswer = await inquirer.prompt([
     {
       type: 'list',
       name: 'cssFramework',
       message: chalk.cyan.bold('\nChoose the CSS Framework:'),
-      choices: [
-        { 
-          name: `${getIconIndicator('tailwind')} Tailwind ${chalk.gray('(Recommended)')}`, 
-          value: 'tailwind',
-          short: 'Tailwind'
-        },
-        { 
-          name: `${getIconIndicator('sass')} Sass`, 
-          value: 'sass',
-          short: 'Sass'
-        },
-        { 
-          name: `${getIconIndicator('css')} CSS`, 
-          value: 'css',
-          short: 'CSS'
-        }
-      ],
+      choices: cssChoices,
       default: 'tailwind'
     }
   ]);
@@ -122,6 +188,9 @@ export async function askQuestions() {
     value: 'none',
     short: 'No library'
   });
+
+  // Display icons before showing the prompt
+  await displayIconsForChoices(componentChoices, iconFiles);
 
   const componentAnswer = await inquirer.prompt([
     {

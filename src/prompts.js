@@ -15,10 +15,7 @@ const logos = {
   logger: '📦',
   router: '📦',
   vite: '📦',
-  webpack: '📦',
-  parcel: '📦',
-  rollup: '📦',
-  esbuild: '📦'
+  webpack: '📦'
 };
 
 export async function askQuestions() {
@@ -52,21 +49,6 @@ export async function askQuestions() {
           name: `${logos.webpack} Webpack`, 
           value: 'webpack',
           short: 'Webpack'
-        },
-        { 
-          name: `${logos.parcel} Parcel`, 
-          value: 'parcel',
-          short: 'Parcel'
-        },
-        { 
-          name: `${logos.rollup} Rollup`, 
-          value: 'rollup',
-          short: 'Rollup'
-        },
-        { 
-          name: `${logos.esbuild} esbuild`, 
-          value: 'esbuild',
-          short: 'esbuild'
         }
       ],
       default: 'vite'

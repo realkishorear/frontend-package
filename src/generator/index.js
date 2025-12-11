@@ -40,10 +40,10 @@ async function createTypeScriptConfig(targetPath, bundler) {
     // Add vite/client types for import.meta.env support
     baseConfig.compilerOptions.types = ["vite/client"];
   } else {
-    // For other bundlers (webpack, parcel, rollup, esbuild)
+    // For webpack bundler
     baseConfig.compilerOptions.moduleResolution = "node";
     baseConfig.compilerOptions.allowImportingTsExtensions = false;
-    // Relax unused checks for non-Vite bundlers to avoid build errors
+    // Relax unused checks for webpack to avoid build errors
     baseConfig.compilerOptions.noUnusedLocals = false;
     baseConfig.compilerOptions.noUnusedParameters = false;
     // Add node types for process.env support
@@ -191,175 +191,9 @@ module.exports = {
       console.log(chalk.green('✅ Configured Webpack'));
       break;
 
-    case 'parcel':
-      // Parcel configuration (zero config, but we can add .parcelrc)
-      const parcelRcPath = path.join(targetPath, '.parcelrc');
-      const parcelRcContent = `{
-  "extends": "@parcel/config-default",
-  "transformers": {
-    "*.{ts,tsx}": ["@parcel/transformer-typescript-tsc"]
-  }
-}
-`;
-      await fs.writeFile(parcelRcPath, parcelRcContent, 'utf-8');
-      
-      if (!packageJson.devDependencies) {
-        packageJson.devDependencies = {};
-      }
-      packageJson.devDependencies['parcel'] = '^2.12.0';
-      packageJson.devDependencies['@parcel/config-default'] = '^2.12.0';
-      packageJson.devDependencies['@parcel/transformer-typescript-tsc'] = '^2.12.0';
-      packageJson.devDependencies['@types/node'] = '^20.10.0';
-      
-      if (!packageJson.scripts) {
-        packageJson.scripts = {};
-      }
-      packageJson.scripts['dev'] = 'parcel index.html';
-      packageJson.scripts['build'] = 'tsc && parcel build index.html';
-      packageJson.scripts['preview'] = 'parcel serve dist/index.html';
-      
-      console.log(chalk.green('✅ Configured Parcel'));
-      break;
-
-    case 'rollup':
-      // Rollup configuration
-      const rollupConfigPath = path.join(targetPath, 'rollup.config.js');
-      const rollupConfigContent = `import resolve from '@rollup/plugin-node-resolve';
-import commonjs from '@rollup/plugin-commonjs';
-import typescript from '@rollup/plugin-typescript';
-import { terser } from 'rollup-plugin-terser';
-import html from '@rollup/plugin-html';
-import serve from 'rollup-plugin-serve';
-import livereload from 'rollup-plugin-livereload';
-
-const isProduction = process.env.NODE_ENV === 'production';
-
-export default {
-  input: 'src/main.tsx',
-  output: {
-    file: 'dist/bundle.js',
-    format: 'iife',
-    sourcemap: !isProduction,
-  },
-  plugins: [
-    resolve({
-      browser: true,
-      extensions: ['.ts', '.tsx', '.js', '.jsx'],
-    }),
-    commonjs(),
-    typescript({
-      tsconfig: './tsconfig.json',
-    }),
-    html({
-      template: 'index.html',
-    }),
-    !isProduction && serve({
-      open: true,
-      contentBase: 'dist',
-      port: 3000,
-    }),
-    !isProduction && livereload('dist'),
-    isProduction && terser(),
-  ].filter(Boolean),
-};
-`;
-      await fs.writeFile(rollupConfigPath, rollupConfigContent, 'utf-8');
-      
-      if (!packageJson.devDependencies) {
-        packageJson.devDependencies = {};
-      }
-      packageJson.devDependencies['rollup'] = '^4.6.1';
-      packageJson.devDependencies['@rollup/plugin-node-resolve'] = '^15.2.3';
-      packageJson.devDependencies['@rollup/plugin-commonjs'] = '^25.0.7';
-      packageJson.devDependencies['@rollup/plugin-typescript'] = '^11.1.5';
-      packageJson.devDependencies['rollup-plugin-terser'] = '^7.0.2';
-      packageJson.devDependencies['@rollup/plugin-html'] = '^1.0.2';
-      packageJson.devDependencies['rollup-plugin-serve'] = '^2.0.2';
-      packageJson.devDependencies['rollup-plugin-livereload'] = '^2.0.2';
-      packageJson.devDependencies['@types/node'] = '^20.10.0';
-      
-      if (!packageJson.scripts) {
-        packageJson.scripts = {};
-      }
-      packageJson.scripts['dev'] = 'rollup -c --watch';
-      packageJson.scripts['build'] = 'tsc && NODE_ENV=production rollup -c';
-      packageJson.scripts['preview'] = 'rollup -c --watch';
-      
-      console.log(chalk.green('✅ Configured Rollup'));
-      break;
-
-    case 'esbuild':
-      // esbuild configuration
-      const esbuildConfigPath = path.join(targetPath, 'esbuild.config.js');
-      const esbuildConfigContent = `import * as esbuild from 'esbuild';
-import { readFileSync, writeFileSync } from 'fs';
-
-const isProduction = process.env.NODE_ENV === 'production';
-
-const config = {
-  entryPoints: ['src/main.tsx'],
-  bundle: true,
-  outdir: 'dist',
-  format: 'iife',
-  platform: 'browser',
-  target: 'es2020',
-  sourcemap: !isProduction,
-  minify: isProduction,
-  loader: {
-    '.ts': 'ts',
-    '.tsx': 'tsx',
-  },
-  plugins: [
-    {
-      name: 'html',
-      setup(build) {
-        build.onEnd(() => {
-          const html = readFileSync('index.html', 'utf-8');
-          const output = html.replace(
-            /<script[^>]*src="[^"]*main\\.tsx"[^>]*><\\/script>/,
-            '<script src="main.js"></script>'
-          );
-          writeFileSync('dist/index.html', output);
-        });
-      },
-    },
-  ],
-};
-
-(async () => {
-  if (isProduction) {
-    await esbuild.build(config).catch(() => process.exit(1));
-  } else {
-    const ctx = await esbuild.context(config);
-    await ctx.watch();
-    await ctx.serve({
-      servedir: 'dist',
-      port: 3000,
-    });
-  }
-})();
-`;
-      await fs.writeFile(esbuildConfigPath, esbuildConfigContent, 'utf-8');
-      
-      if (!packageJson.devDependencies) {
-        packageJson.devDependencies = {};
-      }
-      packageJson.devDependencies['esbuild'] = '^0.19.8';
-      packageJson.devDependencies['@types/node'] = '^20.10.0';
-      
-      if (!packageJson.scripts) {
-        packageJson.scripts = {};
-      }
-      packageJson.scripts['dev'] = 'node esbuild.config.js';
-      packageJson.scripts['build'] = 'tsc && NODE_ENV=production node esbuild.config.js';
-      packageJson.scripts['preview'] = 'node esbuild.config.js';
-      
-      console.log(chalk.green('✅ Configured esbuild'));
-      break;
-
     default:
       console.log(chalk.yellow(`⚠️  Unknown bundler: ${bundler}, defaulting to Vite`));
-      // Fallback to Vite
+      // Fallback to Vite (should only be vite or webpack)
       const defaultViteConfigPath = path.join(targetPath, 'vite.config.ts');
       const defaultViteConfigContent = `import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'

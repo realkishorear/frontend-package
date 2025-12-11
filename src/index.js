@@ -19,7 +19,7 @@ export async function initProject(projectName) {
     // Welcome banner
     console.log(chalk.cyan.bold('\n╔═══════════════════════════════════════════════════════╗'));
     console.log(chalk.cyan.bold('║                                                       ║'));
-    console.log(chalk.cyan.bold('║     Welcome to JGD Frontend Template Generator        ║'));
+    console.log(chalk.cyan.bold('║     Welcome to JGD Frontend Template Engine           ║'));
     console.log(chalk.cyan.bold('║                                                       ║'));
     console.log(chalk.cyan.bold('╚═══════════════════════════════════════════════════════╝\n'));
 
@@ -53,4 +53,3 @@ export async function initProject(projectName) {
     process.exit(1);
   }
 }
-

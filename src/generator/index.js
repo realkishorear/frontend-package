@@ -341,7 +341,7 @@ body {
       if (finalPackageJson.devDependencies?.sass && scssFileExists && hasScssImport) {
         console.log(chalk.green('✅ SCSS setup verified: sass dependency, SCSS file, and import are all configured'));
       } else {
-        console.log(chalk.yellow('⚠️  SCSS setup verification:'));
+        console.log(chalk.yellow('⚠️ SCSS setup verification:'));
         if (!finalPackageJson.devDependencies?.sass) {
           console.log(chalk.yellow('   - sass dependency missing in package.json'));
         }

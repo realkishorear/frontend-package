@@ -20,14 +20,23 @@ async function createTypeScriptConfig(targetPath, bundler) {
       skipLibCheck: true,
       resolveJsonModule: true,
       isolatedModules: true,
-      noEmit: true,
       jsx: "react-jsx",
       strict: true,
       noFallthroughCasesInSwitch: true,
     },
-    include: ["src"],
-    references: [{ path: "./tsconfig.node.json" }]
+    include: ["src"]
   };
+  
+  // Only add tsconfig.node.json reference for Vite (needed for vite.config.ts)
+  if (bundler === 'vite') {
+    baseConfig.references = [{ path: "./tsconfig.node.json" }];
+  }
+  
+  // Set noEmit based on bundler
+  // Note: For webpack with ts-loader, noEmit should be false or ts-loader needs special config
+  // However, ts-loader can work with noEmit: true if configured correctly
+  // We'll keep noEmit: true for both and let ts-loader handle it via compiler API
+  baseConfig.compilerOptions.noEmit = true;
 
   // Bundler-specific configurations
   if (bundler === 'vite') {
@@ -127,6 +136,7 @@ export default defineConfig({
       const webpackConfigPath = path.join(targetPath, 'webpack.config.js');
       const webpackConfigContent = `const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = {
   entry: './src/main.tsx',
@@ -135,7 +145,16 @@ module.exports = {
     rules: [
       {
         test: /\\.tsx?$/,
-        use: 'ts-loader',
+        use: {
+          loader: 'ts-loader',
+          options: {
+            transpileOnly: false,
+            configFile: 'tsconfig.json',
+            compilerOptions: {
+              noEmit: false, // Override noEmit for ts-loader
+            },
+          },
+        },
         exclude: /node_modules/,
       },
       {
@@ -160,9 +179,26 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: './index.html',
     }),
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: 'public',
+          to: '.',
+          noErrorOnMissing: true,
+        },
+      ],
+    }),
   ],
   devServer: {
-    static: './dist',
+    static: [
+      {
+        directory: path.join(__dirname, 'dist'),
+      },
+      {
+        directory: path.join(__dirname, 'public'),
+        publicPath: '/',
+      },
+    ],
     port: 3000,
     hot: true,
     open: true,
@@ -178,6 +214,7 @@ module.exports = {
       packageJson.devDependencies['webpack-cli'] = '^5.1.4';
       packageJson.devDependencies['webpack-dev-server'] = '^4.15.1';
       packageJson.devDependencies['html-webpack-plugin'] = '^5.5.3';
+      packageJson.devDependencies['copy-webpack-plugin'] = '^11.0.0';
       packageJson.devDependencies['ts-loader'] = '^9.5.1';
       packageJson.devDependencies['style-loader'] = '^3.3.3';
       packageJson.devDependencies['css-loader'] = '^6.8.1';
@@ -243,16 +280,29 @@ export async function generateProject(targetPath, answers) {
     // Note: bundler config files and tsconfig will be created separately based on bundler choice
     const baseFiles = [
       'package.json',
-      'tsconfig.node.json',
       'index.html',
       'tailwind.config.js',
       'postcss.config.js'
     ];
+    
+    // Only copy tsconfig.node.json for Vite projects (needed for vite.config.ts)
+    if (bundler === 'vite') {
+      baseFiles.push('tsconfig.node.json');
+    }
 
     for (const file of baseFiles) {
       const srcFile = path.join(basePath, file);
       if (await fs.pathExists(srcFile)) {
-        await fs.copy(srcFile, path.join(targetPath, file));
+        const targetFile = path.join(targetPath, file);
+        await fs.copy(srcFile, targetFile);
+        
+        // For webpack, remove the script tag from index.html (HtmlWebpackPlugin will inject it)
+        if (file === 'index.html' && bundler === 'webpack') {
+          let htmlContent = await fs.readFile(targetFile, 'utf-8');
+          // Remove script tag that references /src/main.tsx
+          htmlContent = htmlContent.replace(/<script[^>]*src=["']\/src\/main\.tsx["'][^>]*><\/script>\s*/g, '');
+          await fs.writeFile(targetFile, htmlContent, 'utf-8');
+        }
       }
     }
     

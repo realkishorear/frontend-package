@@ -12,7 +12,8 @@ const logos = {
   none: '🚫',
   redux: '🔄',
   reactQuery: '🔍',
-  logger: '📝'
+  logger: '📝',
+  router: '🛣️'
 };
 
 export async function askQuestions() {
@@ -125,6 +126,28 @@ export async function askQuestions() {
     }
   ]);
 
+  // Seventh question: Routing type
+  const routingAnswer = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'routingType',
+      message: chalk.cyan.bold('\nChoose routing approach:'),
+      choices: [
+        { 
+          name: `${logos.router} React Router v6 ${chalk.gray('(Manual Routes)')}`, 
+          value: 'v6',
+          short: 'React Router v6'
+        },
+        { 
+          name: `${logos.router} React Router v7+ ${chalk.gray('(File-based Routing)')}`, 
+          value: 'v7',
+          short: 'React Router v7+'
+        }
+      ],
+      default: 'v6'
+    }
+  ]);
+
   // Combine all answers
   return {
     ...templateAnswer,
@@ -132,7 +155,8 @@ export async function askQuestions() {
     ...componentAnswer,
     ...reduxAnswer,
     ...reactQueryAnswer,
-    ...loggerAnswer
+    ...loggerAnswer,
+    ...routingAnswer
   };
 }
 

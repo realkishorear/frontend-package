@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export async function generateProject(targetPath, answers) {
-  let { template, cssFramework, componentLibrary, useRedux, useReactQuery, useLogger } = answers;
+  let { template, cssFramework, componentLibrary, useRedux, useReactQuery, useLogger, routingType } = answers;
   
   // Dashboard and Landing templates require Tailwind CSS
   // Auto-switch to Tailwind if user selected a different CSS framework
@@ -105,6 +105,229 @@ export default App
 `;
         
         await fs.writeFile(appTsxPath, appContent);
+      }
+    }
+
+    // Handle Routing Type
+    if (routingType === 'v7') {
+      console.log(chalk.blue('🛣️  Setting up React Router v7+ (File-based Routing)...'));
+      
+      // Update package.json for React Router v7+
+      const packageJsonPath = path.join(targetPath, 'package.json');
+      let packageJson = {};
+      if (await fs.pathExists(packageJsonPath)) {
+        packageJson = await fs.readJson(packageJsonPath);
+      }
+      
+      // Remove react-router-dom v6
+      delete packageJson.dependencies?.['react-router-dom'];
+      
+      // Add React Router v7+ dependencies
+      if (!packageJson.dependencies) {
+        packageJson.dependencies = {};
+      }
+      packageJson.dependencies['react-router'] = '^7.0.0';
+      packageJson.dependencies['react-router-dom'] = '^7.0.0';
+      
+      if (!packageJson.devDependencies) {
+        packageJson.devDependencies = {};
+      }
+      packageJson.devDependencies['@react-router/dev'] = '^7.0.0';
+      packageJson.devDependencies['@react-router/serve'] = '^7.0.0';
+      
+      // Update scripts
+      if (!packageJson.scripts) {
+        packageJson.scripts = {};
+      }
+      packageJson.scripts['dev'] = 'react-router dev';
+      packageJson.scripts['build'] = 'react-router build';
+      packageJson.scripts['preview'] = 'react-router-serve ./build';
+      packageJson.scripts['typecheck'] = 'react-router typegen';
+      
+      await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
+      console.log(chalk.green('✅ Updated package.json for React Router v7+'));
+      
+      // Create routes directory structure
+      const routesDir = path.join(targetSrcPath, 'routes');
+      await fs.ensureDir(routesDir);
+      
+      // Create root route (layout)
+      // CSS import will be added based on CSS framework selection later
+      const rootRouteContent = `import { Outlet } from 'react-router';
+import { ConfigProvider } from '../config/ConfigProvider';
+
+export default function Root() {
+  return (
+    <ConfigProvider>
+      <Outlet />
+    </ConfigProvider>
+  );
+}
+`;
+      await fs.writeFile(path.join(routesDir, '_layout.tsx'), rootRouteContent, 'utf-8');
+      console.log(chalk.green('✅ Created routes/_layout.tsx'));
+      
+      // Create home route based on template
+      if (template === 'empty') {
+        const homeRouteContent = `export default function Home() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold mb-4">Welcome to Your App</h1>
+        <p className="text-gray-600">Start building something amazing!</p>
+      </div>
+    </div>
+  );
+}
+`;
+        await fs.writeFile(path.join(routesDir, 'index.tsx'), homeRouteContent, 'utf-8');
+      } else if (template === 'dashboard') {
+        // For dashboard, create a route that imports the Dashboard component
+        const dashboardRouteContent = `import Dashboard from '../Dashboard';
+
+export default function DashboardRoute() {
+  return <Dashboard />;
+}
+`;
+        await fs.writeFile(path.join(routesDir, 'index.tsx'), dashboardRouteContent, 'utf-8');
+      } else if (template === 'landing') {
+        // For landing, create a route that imports the Landing component
+        const landingRouteContent = `import Landing from '../Landing';
+
+export default function LandingRoute() {
+  return <Landing />;
+}
+`;
+        await fs.writeFile(path.join(routesDir, 'index.tsx'), landingRouteContent, 'utf-8');
+      }
+      console.log(chalk.green('✅ Created routes/index.tsx'));
+      
+      // Update vite.config.ts for React Router v7+
+      const viteConfigPath = path.join(targetPath, 'vite.config.ts');
+      const viteConfigContent = `import { reactRouter } from '@react-router/dev/vite';
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [
+    reactRouter(),
+    react(),
+  ],
+});
+`;
+      await fs.writeFile(viteConfigPath, viteConfigContent, 'utf-8');
+      console.log(chalk.green('✅ Updated vite.config.ts for React Router v7+'));
+      
+      // Update index.html to use entry.client.tsx
+      const indexHtmlPath = path.join(targetPath, 'index.html');
+      if (await fs.pathExists(indexHtmlPath)) {
+        let indexHtmlContent = await fs.readFile(indexHtmlPath, 'utf-8');
+        // Replace main.tsx with entry.client.tsx
+        indexHtmlContent = indexHtmlContent.replace(/src\/main\.tsx/g, 'src/entry.client.tsx');
+        await fs.writeFile(indexHtmlPath, indexHtmlContent, 'utf-8');
+        console.log(chalk.green('✅ Updated index.html for React Router v7+'));
+      }
+      
+      // Create entry.client.tsx for React Router v7+
+      const entryClientPath = path.join(targetSrcPath, 'entry.client.tsx');
+      const entryClientContent = `import { StrictMode, startTransition } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { HydratedRouter } from 'react-router/dom';
+
+startTransition(() => {
+  hydrateRoot(
+    document,
+    <StrictMode>
+      <HydratedRouter />
+    </StrictMode>
+  );
+});
+`;
+      await fs.writeFile(entryClientPath, entryClientContent, 'utf-8');
+      console.log(chalk.green('✅ Created entry.client.tsx for React Router v7+'));
+      
+      // Create entry.server.tsx
+      const entryServerPath = path.join(targetSrcPath, 'entry.server.tsx');
+      const entryServerContent = `import type { EntryContext } from 'react-router';
+import { ServerRouter } from 'react-router';
+
+export default function handleRequest(
+  request: Request,
+  responseStatusCode: number,
+  responseHeaders: Headers,
+  entryContext: EntryContext
+) {
+  return new Response(
+    '<!DOCTYPE html>' + ServerRouter({ context: entryContext, url: request.url }),
+    {
+      status: responseStatusCode,
+      headers: responseHeaders,
+    }
+  );
+}
+`;
+      await fs.writeFile(entryServerPath, entryServerContent, 'utf-8');
+      console.log(chalk.green('✅ Created entry.server.tsx for React Router v7+'));
+      
+      // Update or remove main.tsx (React Router v7+ uses entry.client.tsx)
+      const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
+      if (await fs.pathExists(mainTsxPath)) {
+        await fs.remove(mainTsxPath);
+        console.log(chalk.blue('🗑️  Removed main.tsx (React Router v7+ uses entry.client.tsx)'));
+      }
+      
+      // Remove or update App.tsx (not needed for React Router v7+)
+      const appTsxPath = path.join(targetSrcPath, 'App.tsx');
+      if (await fs.pathExists(appTsxPath)) {
+        await fs.remove(appTsxPath);
+        console.log(chalk.blue('🗑️  Removed App.tsx (not needed for React Router v7+ file-based routing)'));
+      }
+      
+      // Create react-router.config.ts
+      const routerConfigPath = path.join(targetPath, 'react-router.config.ts');
+      const routerConfigContent = `import type { Config } from '@react-router/dev/config';
+
+export default {
+  // Add your React Router configuration here
+  // See https://reactrouter.com/main/start/file-based/routing for more options
+} satisfies Config;
+`;
+      await fs.writeFile(routerConfigPath, routerConfigContent, 'utf-8');
+      console.log(chalk.green('✅ Created react-router.config.ts'));
+      
+    } else {
+      // React Router v6 - keep existing setup but ensure BrowserRouter is in main.tsx
+      console.log(chalk.blue('🛣️  Using React Router v6 (Manual Routes)'));
+      
+      // Ensure main.tsx has BrowserRouter (it should already from base)
+      const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
+      if (await fs.pathExists(mainTsxPath)) {
+        let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+        if (!mainContent.includes('BrowserRouter')) {
+          // Add BrowserRouter if not present
+          if (mainContent.includes('import')) {
+            mainContent = mainContent.replace(
+              /(import.*from.*['"]react['"])/,
+              "$1\nimport { BrowserRouter } from 'react-router-dom'"
+            );
+          } else {
+            mainContent = "import { BrowserRouter } from 'react-router-dom'\n" + mainContent;
+          }
+          
+          // Wrap App with BrowserRouter
+          if (mainContent.includes('<App')) {
+            mainContent = mainContent.replace(
+              /(<App[^>]*>)/,
+              '<BrowserRouter>\n        $1'
+            );
+            mainContent = mainContent.replace(
+              /(<\/App>)/,
+              '$1\n      </BrowserRouter>'
+            );
+          }
+          
+          await fs.writeFile(mainTsxPath, mainContent, 'utf-8');
+        }
       }
     }
 
@@ -209,57 +432,84 @@ body {
           console.log(chalk.red(`❌ Failed to create ${path.basename(scssPath)}`));
         }
 
-        // Update main.tsx to import .scss instead of .css
-        const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
-        if (await fs.pathExists(mainTsxPath)) {
-          let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+        // Update main.tsx (v6) or root layout (v7+) to import .scss instead of .css
+        let cssImportFilePath;
+        if (routingType === 'v7') {
+          cssImportFilePath = path.join(targetSrcPath, 'routes', '_layout.tsx');
+        } else {
+          cssImportFilePath = path.join(targetSrcPath, 'main.tsx');
+        }
+        
+        if (await fs.pathExists(cssImportFilePath)) {
+          let mainContent = await fs.readFile(cssImportFilePath, 'utf-8');
           
-          // Replace any import of index.css with index.scss
-          // Simple and reliable: just replace index.css with index.scss in import statements
-          // This handles: './index.css', "./index.css", '../index.css', 'index.css', etc.
-          const originalContent = mainContent;
-          
-          // First, try to match and replace the full import line
-          mainContent = mainContent.replace(
-            /(import\s+['"][^'"]*?)index\.css(['"])/g,
-            '$1index.scss$2'
-          );
-          
-          // If that didn't work, use a more aggressive fallback
-          if (mainContent === originalContent && mainContent.includes('index.css')) {
-            console.log(chalk.yellow('   Using fallback replacement method...'));
-            // Replace index.css anywhere in import statements
-            mainContent = mainContent.replace(/index\.css/g, 'index.scss');
+          // For React Router v7+, add CSS import if not present
+          if (routingType === 'v7' && !mainContent.includes('index.') && !mainContent.includes('../index.')) {
+            // Add SCSS import after other imports
+            const importLines = mainContent.split('\n');
+            let lastImportIndex = -1;
+            for (let i = 0; i < importLines.length; i++) {
+              if (importLines[i].trim().startsWith('import ')) {
+                lastImportIndex = i;
+              }
+            }
+            if (lastImportIndex !== -1) {
+              importLines.splice(lastImportIndex + 1, 0, "import '../index.scss';");
+              mainContent = importLines.join('\n');
+            } else {
+              mainContent = "import '../index.scss';\n" + mainContent;
+            }
+          } else {
+            // Replace any import of index.css with index.scss
+            // Simple and reliable: just replace index.css with index.scss in import statements
+            // This handles: './index.css', "./index.css", '../index.css', 'index.css', etc.
+            const originalContent = mainContent;
+            
+            // First, try to match and replace the full import line
+            mainContent = mainContent.replace(
+              /(import\s+['"][^'"]*?)index\.css(['"])/g,
+              '$1index.scss$2'
+            );
+            
+            // If that didn't work, use a more aggressive fallback
+            if (mainContent === originalContent && mainContent.includes('index.css')) {
+              console.log(chalk.yellow('   Using fallback replacement method...'));
+              // Replace index.css anywhere in import statements
+              mainContent = mainContent.replace(/index\.css/g, 'index.scss');
+            }
           }
           
-          await fs.writeFile(mainTsxPath, mainContent);
+          await fs.writeFile(cssImportFilePath, mainContent);
           
           // Verify both the file and import exist
           const scssExists = await fs.pathExists(scssPath);
-          const updatedContent = await fs.readFile(mainTsxPath, 'utf-8');
+          const updatedContent = await fs.readFile(cssImportFilePath, 'utf-8');
           const hasScssImport = updatedContent.includes('index.scss');
           const stillHasCssImport = updatedContent.includes('index.css');
           
-          // Show what was found in main.tsx for debugging
+          // Show what was found for debugging
           const importLines = updatedContent.split('\n').filter(line => line.includes('index.'));
           if (importLines.length > 0) {
             console.log(chalk.gray(`   Found imports: ${importLines.join(', ')}`));
           }
           
           if (scssExists && hasScssImport && !stillHasCssImport) {
-            console.log(chalk.green('✅ SCSS setup complete: file created and import updated'));
+            const fileType = routingType === 'v7' ? 'root layout' : 'main.tsx';
+            console.log(chalk.green(`✅ SCSS setup complete: file created and import updated in ${fileType}`));
           } else {
             if (!scssExists) {
               console.log(chalk.red('❌ Error: SCSS file was not created'));
             }
             if (!hasScssImport || stillHasCssImport) {
-              console.log(chalk.yellow('⚠️  Warning: Import not updated correctly'));
-              console.log(chalk.yellow(`   Current main.tsx still has: ${stillHasCssImport ? 'index.css' : 'no SCSS import'}`));
-              console.log(chalk.yellow('   Please manually change index.css to index.scss in main.tsx'));
+              const fileType = routingType === 'v7' ? 'root layout' : 'main.tsx';
+              console.log(chalk.yellow(`⚠️  Warning: Import not updated correctly`));
+              console.log(chalk.yellow(`   Current ${fileType} still has: ${stillHasCssImport ? 'index.css' : 'no SCSS import'}`));
+              console.log(chalk.yellow(`   Please manually change index.css to index.scss in ${fileType}`));
             }
           }
         } else {
-          console.log(chalk.yellow('⚠️  Warning: main.tsx not found, cannot update SCSS import'));
+          const fileType = routingType === 'v7' ? 'root layout' : 'main.tsx';
+          console.log(chalk.yellow(`⚠️  Warning: ${fileType} not found, cannot update SCSS import`));
         }
       } else if (cssFramework === 'css') {
         // Handle regular CSS
@@ -477,10 +727,16 @@ export default exampleSlice.reducer;
       await fs.writeFile(path.join(slicesDir, 'exampleSlice.ts'), exampleSliceContent, 'utf-8');
       console.log(chalk.green('✅ Created store/slices/exampleSlice.ts'));
       
-      // Update main.tsx to include Redux Provider
-      const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
-      if (await fs.pathExists(mainTsxPath)) {
-        let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+      // Update main.tsx (v6) or root layout (v7+) to include Redux Provider
+      let providerFilePath;
+      if (routingType === 'v7') {
+        providerFilePath = path.join(targetSrcPath, 'routes', '_layout.tsx');
+      } else {
+        providerFilePath = path.join(targetSrcPath, 'main.tsx');
+      }
+      
+      if (await fs.pathExists(providerFilePath)) {
+        let mainContent = await fs.readFile(providerFilePath, 'utf-8');
         
         // Add Redux imports if not already present
         if (!mainContent.includes('react-redux')) {
@@ -493,64 +749,90 @@ export default exampleSlice.reducer;
             }
           }
           
+          // Determine correct import path based on routing type
+          const storeImportPath = routingType === 'v7' ? '../store/store' : './store/store';
+          
           if (lastImportIndex !== -1) {
             importLines.splice(lastImportIndex + 1, 0, 
               "import { Provider } from 'react-redux'",
-              "import { store } from './store/store'"
+              `import { store } from '${storeImportPath}'`
             );
             mainContent = importLines.join('\n');
           } else {
             // If no imports found, add at the beginning
             mainContent = "import { Provider } from 'react-redux'\n" +
-              "import { store } from './store/store'\n" +
+              `import { store } from '${storeImportPath}'\n` +
               mainContent;
           }
         }
         
         // Wrap the entire app with Redux Provider
-        // The structure is usually: ReactDOM.createRoot(...).render(<React.StrictMode>...</React.StrictMode>)
-        // We want: ReactDOM.createRoot(...).render(<Provider><React.StrictMode>...</React.StrictMode></Provider>)
-        
-        if (mainContent.includes('<React.StrictMode>')) {
-          // Wrap StrictMode with Provider
-          mainContent = mainContent.replace(
-            /(<React\.StrictMode>)/,
-            '<Provider store={store}>\n    $1'
-          );
-          mainContent = mainContent.replace(
-            /(<\/React\.StrictMode>)/,
-            '$1\n    </Provider>'
-          );
+        if (routingType === 'v7') {
+          // For React Router v7+, wrap ConfigProvider with Redux Provider
+          if (mainContent.includes('<ConfigProvider>')) {
+            mainContent = mainContent.replace(
+              /(<ConfigProvider>)/,
+              '<Provider store={store}>\n      $1'
+            );
+            mainContent = mainContent.replace(
+              /(<\/ConfigProvider>)/,
+              '$1\n    </Provider>'
+            );
+          } else {
+            // If no ConfigProvider, wrap the return statement
+            mainContent = mainContent.replace(
+              /(return\s+\()/,
+              '$1<Provider store={store}>\n      '
+            );
+            mainContent = mainContent.replace(
+              /(\);?\s*}$)/,
+              '</Provider>$1'
+            );
+          }
         } else {
-          // If no StrictMode, find the first JSX element in render and wrap it
-          // This handles cases where StrictMode might not be present
-          const renderMatch = mainContent.match(/\.render\(\s*([^)]+)\)/);
-          if (renderMatch) {
-            // Try to wrap ConfigProvider or BrowserRouter or App
-            if (mainContent.includes('<ConfigProvider>')) {
-              mainContent = mainContent.replace(
-                /(<ConfigProvider>)/,
-                '<Provider store={store}>\n      $1'
-              );
-              mainContent = mainContent.replace(
-                /(<\/ConfigProvider>)/,
-                '$1\n    </Provider>'
-              );
-            } else if (mainContent.includes('<BrowserRouter>')) {
-              mainContent = mainContent.replace(
-                /(<BrowserRouter>)/,
-                '<Provider store={store}>\n      $1'
-              );
-              mainContent = mainContent.replace(
-                /(<\/BrowserRouter>)/,
-                '$1\n    </Provider>'
-              );
+          // For React Router v6, wrap in main.tsx
+          if (mainContent.includes('<React.StrictMode>')) {
+            // Wrap StrictMode with Provider
+            mainContent = mainContent.replace(
+              /(<React\.StrictMode>)/,
+              '<Provider store={store}>\n    $1'
+            );
+            mainContent = mainContent.replace(
+              /(<\/React\.StrictMode>)/,
+              '$1\n    </Provider>'
+            );
+          } else {
+            // If no StrictMode, find the first JSX element in render and wrap it
+            // This handles cases where StrictMode might not be present
+            const renderMatch = mainContent.match(/\.render\(\s*([^)]+)\)/);
+            if (renderMatch) {
+              // Try to wrap ConfigProvider or BrowserRouter or App
+              if (mainContent.includes('<ConfigProvider>')) {
+                mainContent = mainContent.replace(
+                  /(<ConfigProvider>)/,
+                  '<Provider store={store}>\n      $1'
+                );
+                mainContent = mainContent.replace(
+                  /(<\/ConfigProvider>)/,
+                  '$1\n    </Provider>'
+                );
+              } else if (mainContent.includes('<BrowserRouter>')) {
+                mainContent = mainContent.replace(
+                  /(<BrowserRouter>)/,
+                  '<Provider store={store}>\n      $1'
+                );
+                mainContent = mainContent.replace(
+                  /(<\/BrowserRouter>)/,
+                  '$1\n    </Provider>'
+                );
+              }
             }
           }
         }
         
-        await fs.writeFile(mainTsxPath, mainContent, 'utf-8');
-        console.log(chalk.green('✅ Updated main.tsx with Redux Provider'));
+        await fs.writeFile(providerFilePath, mainContent, 'utf-8');
+        const fileType = routingType === 'v7' ? 'root layout' : 'main.tsx';
+        console.log(chalk.green(`✅ Updated ${fileType} with Redux Provider`));
       }
     }
     
@@ -626,10 +908,16 @@ export const useExampleDataById = (id: string) => {
       await fs.writeFile(path.join(hooksDir, 'useExampleQuery.ts'), exampleQueryContent, 'utf-8');
       console.log(chalk.green('✅ Created hooks/useExampleQuery.ts'));
       
-      // Update main.tsx to include QueryClientProvider
-      const mainTsxPath = path.join(targetSrcPath, 'main.tsx');
-      if (await fs.pathExists(mainTsxPath)) {
-        let mainContent = await fs.readFile(mainTsxPath, 'utf-8');
+      // Update main.tsx (v6) or root layout (v7+) to include QueryClientProvider
+      let queryProviderFilePath;
+      if (routingType === 'v7') {
+        queryProviderFilePath = path.join(targetSrcPath, 'routes', '_layout.tsx');
+      } else {
+        queryProviderFilePath = path.join(targetSrcPath, 'main.tsx');
+      }
+      
+      if (await fs.pathExists(queryProviderFilePath)) {
+        let mainContent = await fs.readFile(queryProviderFilePath, 'utf-8');
         
         // Add React Query imports if not already present
         if (!mainContent.includes('@tanstack/react-query')) {
@@ -642,66 +930,105 @@ export const useExampleDataById = (id: string) => {
             }
           }
           
+          // Determine correct import path based on routing type
+          const queryClientImportPath = routingType === 'v7' ? '../lib/queryClient' : './lib/queryClient';
+          
           if (lastImportIndex !== -1) {
             importLines.splice(lastImportIndex + 1, 0, 
               "import { QueryClientProvider } from '@tanstack/react-query'",
-              "import { queryClient } from './lib/queryClient'"
+              `import { queryClient } from '${queryClientImportPath}'`
             );
             mainContent = importLines.join('\n');
           } else {
             // If no imports found, add at the beginning
             mainContent = "import { QueryClientProvider } from '@tanstack/react-query'\n" +
-              "import { queryClient } from './lib/queryClient'\n" +
+              `import { queryClient } from '${queryClientImportPath}'\n` +
               mainContent;
           }
         }
         
         // Wrap the app with QueryClientProvider
-        // It should wrap inside Provider if Redux is also selected, or wrap the outermost element
-        if (mainContent.includes('<Provider store={store}>')) {
-          // If Redux Provider exists, wrap inside it
-          mainContent = mainContent.replace(
-            /(<Provider store={store}>)/,
-            '$1\n      <QueryClientProvider client={queryClient}>'
-          );
-          mainContent = mainContent.replace(
-            /(<\/Provider>)/,
-            '</QueryClientProvider>\n    $1'
-          );
-        } else if (mainContent.includes('<React.StrictMode>')) {
-          // Wrap StrictMode with QueryClientProvider
-          mainContent = mainContent.replace(
-            /(<React\.StrictMode>)/,
-            '<QueryClientProvider client={queryClient}>\n    $1'
-          );
-          mainContent = mainContent.replace(
-            /(<\/React\.StrictMode>)/,
-            '$1\n    </QueryClientProvider>'
-          );
-        } else if (mainContent.includes('<ConfigProvider>')) {
-          // Wrap ConfigProvider with QueryClientProvider
-          mainContent = mainContent.replace(
-            /(<ConfigProvider>)/,
-            '<QueryClientProvider client={queryClient}>\n      $1'
-          );
-          mainContent = mainContent.replace(
-            /(<\/ConfigProvider>)/,
-            '$1\n    </QueryClientProvider>'
-          );
-        } else if (mainContent.includes('<BrowserRouter>')) {
-          // Wrap BrowserRouter with QueryClientProvider
-          mainContent = mainContent.replace(
-            /(<BrowserRouter>)/,
-            '<QueryClientProvider client={queryClient}>\n      $1'
-          );
-          mainContent = mainContent.replace(
-            /(<\/BrowserRouter>)/,
-            '$1\n    </QueryClientProvider>'
-          );
+        if (routingType === 'v7') {
+          // For React Router v7+, wrap inside Redux Provider if it exists, otherwise wrap ConfigProvider
+          if (mainContent.includes('<Provider store={store}>')) {
+            // If Redux Provider exists, wrap inside it
+            mainContent = mainContent.replace(
+              /(<Provider store={store}>)/,
+              '$1\n      <QueryClientProvider client={queryClient}>'
+            );
+            mainContent = mainContent.replace(
+              /(<\/Provider>)/,
+              '</QueryClientProvider>\n    $1'
+            );
+          } else if (mainContent.includes('<ConfigProvider>')) {
+            // Wrap ConfigProvider with QueryClientProvider
+            mainContent = mainContent.replace(
+              /(<ConfigProvider>)/,
+              '<QueryClientProvider client={queryClient}>\n      $1'
+            );
+            mainContent = mainContent.replace(
+              /(<\/ConfigProvider>)/,
+              '$1\n    </QueryClientProvider>'
+            );
+          } else {
+            // Wrap the return statement
+            mainContent = mainContent.replace(
+              /(return\s+\()/,
+              '$1<QueryClientProvider client={queryClient}>\n      '
+            );
+            mainContent = mainContent.replace(
+              /(\);?\s*}$)/,
+              '</QueryClientProvider>$1'
+            );
+          }
+        } else {
+          // For React Router v6, wrap in main.tsx
+          if (mainContent.includes('<Provider store={store}>')) {
+            // If Redux Provider exists, wrap inside it
+            mainContent = mainContent.replace(
+              /(<Provider store={store}>)/,
+              '$1\n      <QueryClientProvider client={queryClient}>'
+            );
+            mainContent = mainContent.replace(
+              /(<\/Provider>)/,
+              '</QueryClientProvider>\n    $1'
+            );
+          } else if (mainContent.includes('<React.StrictMode>')) {
+            // Wrap StrictMode with QueryClientProvider
+            mainContent = mainContent.replace(
+              /(<React\.StrictMode>)/,
+              '<QueryClientProvider client={queryClient}>\n    $1'
+            );
+            mainContent = mainContent.replace(
+              /(<\/React\.StrictMode>)/,
+              '$1\n    </QueryClientProvider>'
+            );
+          } else if (mainContent.includes('<ConfigProvider>')) {
+            // Wrap ConfigProvider with QueryClientProvider
+            mainContent = mainContent.replace(
+              /(<ConfigProvider>)/,
+              '<QueryClientProvider client={queryClient}>\n      $1'
+            );
+            mainContent = mainContent.replace(
+              /(<\/ConfigProvider>)/,
+              '$1\n    </QueryClientProvider>'
+            );
+          } else if (mainContent.includes('<BrowserRouter>')) {
+            // Wrap BrowserRouter with QueryClientProvider
+            mainContent = mainContent.replace(
+              /(<BrowserRouter>)/,
+              '<QueryClientProvider client={queryClient}>\n      $1'
+            );
+            mainContent = mainContent.replace(
+              /(<\/BrowserRouter>)/,
+              '$1\n    </QueryClientProvider>'
+            );
+          }
         }
         
-        await fs.writeFile(mainTsxPath, mainContent, 'utf-8');
-        console.log(chalk.green('✅ Updated main.tsx with QueryClientProvider'));
+        await fs.writeFile(queryProviderFilePath, mainContent, 'utf-8');
+        const fileType = routingType === 'v7' ? 'root layout' : 'main.tsx';
+        console.log(chalk.green(`✅ Updated ${fileType} with QueryClientProvider`));
       }
     }
     
@@ -788,8 +1115,18 @@ export const createLogger = (prefix: string) => {
     if (cssFramework === 'sass') {
       const finalPackageJson = await fs.readJson(packageJsonPath);
       const scssFileExists = await fs.pathExists(path.join(targetSrcPath, 'index.scss'));
-      const mainTsxContent = await fs.readFile(path.join(targetSrcPath, 'main.tsx'), 'utf-8');
-      const hasScssImport = mainTsxContent.includes('index.scss');
+      // Check import in appropriate file based on routing type
+      let checkFilePath;
+      if (routingType === 'v7') {
+        checkFilePath = path.join(targetSrcPath, 'entry.client.tsx');
+      } else {
+        checkFilePath = path.join(targetSrcPath, 'main.tsx');
+      }
+      let hasScssImport = false;
+      if (await fs.pathExists(checkFilePath)) {
+        const fileContent = await fs.readFile(checkFilePath, 'utf-8');
+        hasScssImport = fileContent.includes('index.scss');
+      }
       
       if (finalPackageJson.devDependencies?.sass && scssFileExists && hasScssImport) {
         console.log(chalk.green('✅ SCSS setup verified: sass dependency, SCSS file, and import are all configured'));

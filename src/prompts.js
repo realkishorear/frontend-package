@@ -1,18 +1,55 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 
-// Logo/Icon mappings
-const logos = {
-  tailwind: '⚡',
-  sass: '💎',
-  css: '🎨',
-  mui: '🎨',
-  antd: '🐜',
-  shadcn: '✨',
-  none: '🚫',
-  redux: '🔄',
-  reactQuery: '🔍',
-  logger: '📝'
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Get icon paths from icons folder
+const iconsDir = path.join(__dirname, '..', 'icons');
+
+// Helper to check if icon file exists (synchronous)
+const iconExists = (iconName) => {
+  try {
+    const iconPath = path.join(iconsDir, iconName);
+    return fs.existsSync(iconPath);
+  } catch {
+    return false;
+  }
+};
+
+// Icon file mappings - map option values to icon file names
+const iconFiles = {
+  tailwind: 'tailwind.jpg',
+  sass: 'sass.png',
+  css: 'css.jpg',
+  mui: 'mui.png',
+  antd: 'antd.png'
+};
+
+// Helper to get icon indicator - shows icon emoji if icon file exists
+const getIconIndicator = (optionValue) => {
+  const iconFile = iconFiles[optionValue];
+  if (iconFile && iconExists(iconFile)) {
+    // Icon file exists - use a visual indicator
+    return '🖼️ '; // or we could use the actual icon name reference
+  }
+  // Fallback to emoji if no icon file
+  const fallbackEmojis = {
+    tailwind: '⚡',
+    sass: '💎',
+    css: '🎨',
+    mui: '🎨',
+    antd: '🐜',
+    shadcn: '✨',
+    none: '🚫',
+    redux: '🔄',
+    reactQuery: '🔍',
+    logger: '📝'
+  };
+  return fallbackEmojis[optionValue] || '';
 };
 
 export async function askQuestions() {
@@ -38,17 +75,17 @@ export async function askQuestions() {
       message: chalk.cyan.bold('\nChoose the CSS Framework:'),
       choices: [
         { 
-          name: `${logos.tailwind} Tailwind ${chalk.gray('(Recommended)')}`, 
+          name: `${getIconIndicator('tailwind')} Tailwind ${chalk.gray('(Recommended)')}`, 
           value: 'tailwind',
           short: 'Tailwind'
         },
         { 
-          name: `${logos.sass} Sass`, 
+          name: `${getIconIndicator('sass')} Sass`, 
           value: 'sass',
           short: 'Sass'
         },
         { 
-          name: `${logos.css} CSS`, 
+          name: `${getIconIndicator('css')} CSS`, 
           value: 'css',
           short: 'CSS'
         }
@@ -60,12 +97,12 @@ export async function askQuestions() {
   // Third question: Component Library (conditional based on CSS framework)
   const componentChoices = [
     { 
-      name: `${logos.mui} Material UI`, 
+      name: `${getIconIndicator('mui')} Material UI`, 
       value: 'mui',
       short: 'Material UI'
     },
     { 
-      name: `${logos.antd} AntDesign`, 
+      name: `${getIconIndicator('antd')} AntDesign`, 
       value: 'antd',
       short: 'AntDesign'
     }
@@ -74,14 +111,14 @@ export async function askQuestions() {
   // Only add Shadcn if Tailwind is selected
   if (cssAnswer.cssFramework === 'tailwind') {
     componentChoices.push({
-      name: `${logos.shadcn} Shadcn`,
+      name: `${getIconIndicator('shadcn')} Shadcn`,
       value: 'shadcn',
       short: 'Shadcn'
     });
   }
 
   componentChoices.push({
-    name: `${logos.none} No library`,
+    name: `${getIconIndicator('none')} No library`,
     value: 'none',
     short: 'No library'
   });

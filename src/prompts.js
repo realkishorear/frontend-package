@@ -11,7 +11,8 @@ const logos = {
   shadcn: '✨',
   none: '🚫',
   redux: '🔄',
-  reactQuery: '🔍'
+  reactQuery: '🔍',
+  logger: '📝'
 };
 
 export async function askQuestions() {
@@ -114,13 +115,24 @@ export async function askQuestions() {
     }
   ]);
 
+  // Sixth question: Logger (loglevel)
+  const loggerAnswer = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'useLogger',
+      message: chalk.cyan.bold('\nDo you want to use loglevel for logging?'),
+      default: false
+    }
+  ]);
+
   // Combine all answers
   return {
     ...templateAnswer,
     ...cssAnswer,
     ...componentAnswer,
     ...reduxAnswer,
-    ...reactQueryAnswer
+    ...reactQueryAnswer,
+    ...loggerAnswer
   };
 }
 

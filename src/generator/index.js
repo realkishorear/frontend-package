@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export async function generateProject(targetPath, answers) {
-  let { template, cssFramework, componentLibrary, useRedux, useReactQuery } = answers;
+  let { template, cssFramework, componentLibrary, useRedux, useReactQuery, useLogger } = answers;
   
   // Dashboard and Landing templates require Tailwind CSS
   // Auto-switch to Tailwind if user selected a different CSS framework
@@ -348,7 +348,17 @@ body {
         console.log(chalk.green('✅ Added React Query dependencies to package.json'));
       }
       
-      // Save package.json with all dependencies (CSS framework + component library + Redux + React Query)
+      // Handle Logger setup
+      if (useLogger) {
+        console.log(chalk.blue('✅ Setting up loglevel logger...'));
+        
+        // Add loglevel dependency
+        packageJson.dependencies['loglevel'] = '^1.9.1';
+        
+        console.log(chalk.green('✅ Added loglevel dependency to package.json'));
+      }
+      
+      // Save package.json with all dependencies (CSS framework + component library + Redux + React Query + Logger)
       await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
     }
     
@@ -695,6 +705,85 @@ export const useExampleDataById = (id: string) => {
       }
     }
     
+    // Setup Logger if selected
+    if (useLogger) {
+      console.log(chalk.blue('📁 Setting up loglevel logger...'));
+      
+      // Create lib directory if it doesn't exist (might have been created for React Query)
+      const libDir = path.join(targetSrcPath, 'lib');
+      await fs.ensureDir(libDir);
+      
+      // Create logger configuration
+      const loggerContent = `import log from 'loglevel';
+
+// Set default log level based on environment
+const isDevelopment = import.meta.env.DEV;
+const isProduction = import.meta.env.PROD;
+
+if (isDevelopment) {
+  // In development, show all logs
+  log.setLevel('DEBUG');
+} else if (isProduction) {
+  // In production, only show warnings and errors
+  log.setLevel('WARN');
+} else {
+  // Default to info level
+  log.setLevel('INFO');
+}
+
+// Export configured logger
+export default log;
+
+// You can also export individual log methods for convenience
+export const { trace, debug, info, warn, error } = log;
+
+// Example usage:
+// import logger from './lib/logger';
+// logger.info('Application started');
+// logger.error('Something went wrong', error);
+// 
+// Or use individual methods:
+// import { info, error } from './lib/logger';
+// info('User logged in');
+// error('Failed to fetch data', error);
+`;
+      
+      await fs.writeFile(path.join(libDir, 'logger.ts'), loggerContent, 'utf-8');
+      console.log(chalk.green('✅ Created lib/logger.ts'));
+      
+      // Also create a utils directory with a logger utility if needed
+      const utilsDir = path.join(targetSrcPath, 'utils');
+      await fs.ensureDir(utilsDir);
+      
+      // Create a logger utility with additional features
+      const loggerUtilContent = `import log from '../lib/logger';
+
+/**
+ * Logger utility with additional helper methods
+ */
+
+// Create a logger with a prefix
+export const createLogger = (prefix: string) => {
+  return {
+    trace: (...args: any[]) => log.trace(\`[\${prefix}]\`, ...args),
+    debug: (...args: any[]) => log.debug(\`[\${prefix}]\`, ...args),
+    info: (...args: any[]) => log.info(\`[\${prefix}]\`, ...args),
+    warn: (...args: any[]) => log.warn(\`[\${prefix}]\`, ...args),
+    error: (...args: any[]) => log.error(\`[\${prefix}]\`, ...args),
+  };
+};
+
+// Example usage:
+// import { createLogger } from './utils/logger';
+// const logger = createLogger('API');
+// logger.info('Fetching user data');
+// logger.error('Failed to fetch', error);
+`;
+      
+      await fs.writeFile(path.join(utilsDir, 'logger.ts'), loggerUtilContent, 'utf-8');
+      console.log(chalk.green('✅ Created utils/logger.ts'));
+    }
+    
     // Final verification before npm install
     if (cssFramework === 'sass') {
       const finalPackageJson = await fs.readJson(packageJsonPath);
@@ -723,6 +812,7 @@ export const useExampleDataById = (id: string) => {
     if (cssFramework === 'sass') dependencyList.push('sass');
     if (useRedux) dependencyList.push('Redux Toolkit & React-Redux');
     if (useReactQuery) dependencyList.push('React Query (TanStack Query)');
+    if (useLogger) dependencyList.push('loglevel');
     if (dependencyList.length > 0) {
       console.log(chalk.blue(`   This will install all dependencies including ${dependencyList.join(', ')}...`));
     } else {
@@ -896,6 +986,50 @@ export const useExampleDataById = (id: string) => {
         if (!hasQueryClientProvider) {
           console.log(chalk.red('   ✗ QueryClientProvider not found in main.tsx'));
           console.log(chalk.yellow('   → Manually wrap your app with <QueryClientProvider client={queryClient}>'));
+        }
+      }
+    }
+    
+    // Verify Logger setup if Logger was selected
+    if (useLogger) {
+      console.log(chalk.blue('\n🔍 Verifying Logger setup...'));
+      
+      // Check if loglevel package was installed
+      const nodeModulesLogger = path.join(targetPath, 'node_modules', 'loglevel');
+      const loggerInstalled = await fs.pathExists(nodeModulesLogger);
+      
+      // Check package.json
+      const finalPackageJson = await fs.readJson(packageJsonPath);
+      const hasLoggerInPackage = !!finalPackageJson.dependencies?.['loglevel'];
+      
+      // Check logger files
+      const loggerFileExists = await fs.pathExists(path.join(targetSrcPath, 'lib', 'logger.ts'));
+      const loggerUtilExists = await fs.pathExists(path.join(targetSrcPath, 'utils', 'logger.ts'));
+      
+      if (loggerInstalled && hasLoggerInPackage && loggerFileExists && loggerUtilExists) {
+        console.log(chalk.green('✅ Logger is fully configured and ready to use!'));
+        console.log(chalk.green('   ✓ loglevel package installed'));
+        console.log(chalk.green('   ✓ Logger configuration created'));
+        console.log(chalk.green('   ✓ Logger utility helpers created'));
+        console.log(chalk.blue('\n💡 Logger is configured with environment-based log levels'));
+        console.log(chalk.blue('   Development: DEBUG level (all logs)'));
+        console.log(chalk.blue('   Production: WARN level (warnings and errors only)'));
+        console.log(chalk.blue('   Example: import logger from "./lib/logger"'));
+        console.log(chalk.blue('   Example: import { createLogger } from "./utils/logger"'));
+      } else {
+        console.log(chalk.yellow('⚠️  Logger setup verification issues:'));
+        if (!loggerInstalled) {
+          console.log(chalk.red('   ✗ loglevel package not found in node_modules'));
+          console.log(chalk.yellow('   → Try running: npm install loglevel'));
+        }
+        if (!hasLoggerInPackage) {
+          console.log(chalk.red('   ✗ loglevel missing from package.json'));
+        }
+        if (!loggerFileExists) {
+          console.log(chalk.red('   ✗ lib/logger.ts file not found'));
+        }
+        if (!loggerUtilExists) {
+          console.log(chalk.red('   ✗ utils/logger.ts file not found'));
         }
       }
     }

@@ -174,6 +174,7 @@ module.exports = {
     filename: 'bundle.[contenthash].js',
     path: path.resolve(__dirname, 'dist'),
     clean: true,
+    publicPath: '/',
   },
   plugins: [
     new HtmlWebpackPlugin({
@@ -192,13 +193,11 @@ module.exports = {
   devServer: {
     static: [
       {
-        directory: path.join(__dirname, 'dist'),
-      },
-      {
         directory: path.join(__dirname, 'public'),
         publicPath: '/',
       },
     ],
+    historyApiFallback: true,
     port: 3000,
     hot: true,
     open: true,
@@ -432,16 +431,16 @@ export default App
       // Create root route (layout)
       // CSS import will be added based on CSS framework selection later
       const rootRouteContent = `import { Outlet } from 'react-router';
-import { ConfigProvider } from '../config/ConfigProvider';
+      import { ConfigProvider } from '../config/ConfigProvider';
 
-export default function Root() {
-  return (
-    <ConfigProvider>
-      <Outlet />
-    </ConfigProvider>
-  );
-}
-`;
+      export default function Root() {
+        return (
+          <ConfigProvider>
+            <Outlet />
+          </ConfigProvider>
+        );
+      }`;
+
       await fs.writeFile(path.join(routesDir, '_layout.tsx'), rootRouteContent, 'utf-8');
       console.log(chalk.green('✅ Created routes/_layout.tsx'));
       
@@ -824,7 +823,7 @@ body {
         console.log(chalk.blue(`ℹ️ Shadcn/ui selected - you'll need to initialize it separately after project creation`));
         console.log(chalk.gray(`   Run: npx shadcn-ui@latest init`));
       } else {
-        console.log(chalk.yellow(`ℹ️  Component library "${componentLibrary}" will be installed with dependencies`));
+        console.log(chalk.yellow(`ℹ️ Component library "${componentLibrary}" will be installed with dependencies`));
       }
     }
 

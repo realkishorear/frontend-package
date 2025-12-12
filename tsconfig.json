@@ -2,14 +2,30 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",
+    "lib": ["ES2020"],
     "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "strict": false,
-    "noEmit": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src"
   },
   "include": ["src/**/*"],
   "exclude": [
     "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts",
     "src/generator/configs/**/*",
     "src/generator/base/**/*",
     "src/generator/templates/**/*"

@@ -3,6 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { execa } from 'execa';
 import chalk from 'chalk';
+import { installDependencies } from '../utils/packageManager.js';
+import { logger } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1531,7 +1533,7 @@ export const scaleIn = {
       }
     }
 
-    console.log(chalk.blue('📦 Installing dependencies...'));
+    logger.info('📦 Installing dependencies...');
     const dependencyList = [];
     if (cssFramework === 'sass') dependencyList.push('sass');
     if (useRedux) dependencyList.push('Redux Toolkit & React-Redux');
@@ -1539,18 +1541,19 @@ export const scaleIn = {
     if (useLogger) dependencyList.push('loglevel');
     if (useAnimation) dependencyList.push('Framer Motion');
     if (dependencyList.length > 0) {
-      console.log(chalk.blue(`   This will install all dependencies including ${dependencyList.join(', ')}...`));
+      logger.info(`   This will install all dependencies including ${dependencyList.join(', ')}...`);
     } else {
-      console.log(chalk.blue('   This will install all dependencies...'));
+      logger.info('   This will install all dependencies...');
     }
     
-    // Install dependencies
-    await execa('npm', ['install'], {
-      cwd: targetPath,
-      stdio: 'inherit'
-    });
-
-    console.log(chalk.green('✅ Dependencies installed successfully!'));
+    // Install dependencies using detected package manager
+    try {
+      await installDependencies(targetPath);
+      logger.success('Dependencies installed successfully!');
+    } catch (error) {
+      logger.error(`Failed to install dependencies: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
+    }
     
     // Verify SCSS setup if SASS was selected
     if (cssFramework === 'sass') {

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
-import Hero from './Hero'
-import Features from './Features'
-import Footer from './Footer'
+import Hero from './components/Hero'
+import Features from './components/Features'
+import Footer from './components/Footer'
 
 function Landing() {
   return (

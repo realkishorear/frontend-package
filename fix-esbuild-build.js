@@ -10,7 +10,6 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 async function fixProject() {
   const projectRoot = process.cwd();
   
@@ -80,4 +79,3 @@ async function fixProject() {
 }
 
 fixProject().catch(console.error);
-

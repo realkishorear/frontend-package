@@ -161,6 +161,9 @@ async function configureBundler(targetPath, bundler, cssFramework, routingType) 
         
         if (await fs.pathExists(webpackConfigSrc)) {
           await fs.copy(webpackConfigSrc, path.join(targetPath, 'webpack.config.js'));
+          console.log(chalk.green('✅ Copied webpack.config.js'));
+        } else {
+          console.log(chalk.yellow(`⚠️  webpack.config.js not found at: ${webpackConfigSrc}`));
         }
         if (await fs.pathExists(tsconfigSrc)) {
           await fs.copy(tsconfigSrc, path.join(targetPath, 'tsconfig.json'));
@@ -168,6 +171,9 @@ async function configureBundler(targetPath, bundler, cssFramework, routingType) 
         if (await fs.pathExists(postcssConfigSrc)) {
           await fs.copy(postcssConfigSrc, path.join(targetPath, 'postcss.config.js'));
         }
+      } else {
+        console.log(chalk.yellow(`⚠️  Config path not found: ${configPath}`));
+        console.log(chalk.yellow(`   __dirname: ${__dirname}`));
       }
       
       if (!packageJson.devDependencies) {

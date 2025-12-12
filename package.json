@@ -32,7 +32,8 @@
     "npm": ">=9.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run build:copy",
+    "build:copy": "node scripts/copy-generator.js",
     "dev": "tsc --watch",
     "postinstall": "node bin/postinstall.js || echo 'Build skipped - will build on first run'",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",

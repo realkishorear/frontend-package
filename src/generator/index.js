@@ -137,10 +137,13 @@ export default defineConfig({
       const webpackConfigContent = `const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+
+const isProduction = process.env.NODE_ENV === 'production';
 
 module.exports = {
   entry: './src/main.tsx',
-  mode: process.env.NODE_ENV || 'development',
+  mode: isProduction ? 'production' : 'development',
   module: {
     rules: [
       {
@@ -158,8 +161,55 @@ module.exports = {
         exclude: /node_modules/,
       },
       {
+        test: /\\.(scss|sass)$/i,
+        use: [
+          isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              importLoaders: 2,
+              sourceMap: !isProduction,
+            },
+          },
+          {
+            loader: 'postcss-loader',
+            options: {
+              // postcss-loader will auto-detect postcss.config.js if it exists
+              // It handles both CommonJS and ES module formats
+              sourceMap: !isProduction,
+            },
+          },
+          {
+            loader: 'sass-loader',
+            options: {
+              sourceMap: !isProduction,
+              sassOptions: {
+                outputStyle: isProduction ? 'compressed' : 'expanded',
+              },
+            },
+          },
+        ],
+      },
+      {
         test: /\\.css$/i,
-        use: ['style-loader', 'css-loader'],
+        use: [
+          isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              importLoaders: 1,
+              sourceMap: !isProduction,
+            },
+          },
+          {
+            loader: 'postcss-loader',
+            options: {
+              // postcss-loader will auto-detect postcss.config.js if it exists
+              // It handles both CommonJS and ES module formats
+              sourceMap: !isProduction,
+            },
+          },
+        ],
       },
       {
         test: /\\.(png|jpe?g|gif|svg)$/i,
@@ -168,10 +218,10 @@ module.exports = {
     ],
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.js'],
+    extensions: ['.tsx', '.ts', '.js', '.jsx'],
   },
   output: {
-    filename: 'bundle.[contenthash].js',
+    filename: isProduction ? 'js/[name].[contenthash].js' : 'js/[name].js',
     path: path.resolve(__dirname, 'dist'),
     clean: true,
     publicPath: '/',
@@ -179,6 +229,7 @@ module.exports = {
   plugins: [
     new HtmlWebpackPlugin({
       template: './index.html',
+      minify: isProduction,
     }),
     new CopyWebpackPlugin({
       patterns: [
@@ -189,6 +240,14 @@ module.exports = {
         },
       ],
     }),
+    ...(isProduction
+      ? [
+          new MiniCssExtractPlugin({
+            filename: 'css/[name].[contenthash].css',
+            chunkFilename: 'css/[name].[contenthash].chunk.css',
+          }),
+        ]
+      : []),
   ],
   devServer: {
     static: [
@@ -201,6 +260,23 @@ module.exports = {
     port: 3000,
     hot: true,
     open: true,
+    compress: true,
+  },
+  devtool: isProduction ? 'source-map' : 'eval-source-map',
+  optimization: {
+    minimize: isProduction,
+    splitChunks: isProduction
+      ? {
+          chunks: 'all',
+          cacheGroups: {
+            vendor: {
+              test: /[\\\\/]node_modules[\\\\/]/,
+              name: 'vendors',
+              priority: 10,
+            },
+          },
+        }
+      : false,
   },
 };
 `;
@@ -217,6 +293,12 @@ module.exports = {
       packageJson.devDependencies['ts-loader'] = '^9.5.1';
       packageJson.devDependencies['style-loader'] = '^3.3.3';
       packageJson.devDependencies['css-loader'] = '^6.8.1';
+      packageJson.devDependencies['sass-loader'] = '^13.3.2';
+      packageJson.devDependencies['sass'] = '^1.69.0';
+      packageJson.devDependencies['mini-css-extract-plugin'] = '^2.7.6';
+      packageJson.devDependencies['postcss-loader'] = '^7.3.3';
+      packageJson.devDependencies['postcss'] = '^8.4.32';
+      packageJson.devDependencies['autoprefixer'] = '^10.4.16';
       packageJson.devDependencies['@types/node'] = '^20.10.0';
       
       if (!packageJson.scripts) {
@@ -226,7 +308,7 @@ module.exports = {
       packageJson.scripts['build'] = 'tsc && webpack --mode production';
       packageJson.scripts['preview'] = 'webpack serve --mode production';
       
-      console.log(chalk.green('✅ Configured Webpack'));
+      console.log(chalk.green('✅ Configured Webpack with SCSS and CSS extraction support'));
       break;
 
     default:
@@ -618,6 +700,22 @@ export default {
     if (cssFramework === 'tailwind') {
       // Keep Tailwind - no changes needed
       console.log(chalk.blue('✅ Tailwind CSS will be configured'));
+      
+      // Convert postcss.config.js to CommonJS format for webpack
+      if (bundler === 'webpack') {
+        const postcssConfigPath = path.join(targetPath, 'postcss.config.js');
+        if (await fs.pathExists(postcssConfigPath)) {
+          const postcssConfigContent = `module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+`;
+          await fs.writeFile(postcssConfigPath, postcssConfigContent, 'utf-8');
+          console.log(chalk.blue('✅ Converted postcss.config.js to CommonJS format for webpack'));
+        }
+      }
     } else {
       // Remove Tailwind files if not selected
       const tailwindFiles = [

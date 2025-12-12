@@ -65,12 +65,21 @@ async function createTypeScriptConfig(targetPath, bundler) {
   console.log(chalk.green(`✅ Created tsconfig.json for ${bundler}`));
 }
 
-async function configureBundler(targetPath, bundler, routingType) {
+function getConfigPath(bundler, cssFramework) {
+  // Map bundler + CSS framework to config directory
+  const configDir = path.join(__dirname, 'configs', `${bundler}-${cssFramework}`);
+  return configDir;
+}
+
+async function configureBundler(targetPath, bundler, cssFramework, routingType) {
   const packageJsonPath = path.join(targetPath, 'package.json');
   let packageJson = {};
   if (await fs.pathExists(packageJsonPath)) {
     packageJson = await fs.readJson(packageJsonPath);
   }
+  
+  // Get the static config directory for this combination
+  const configPath = getConfigPath(bundler, cssFramework);
 
   // Remove Vite-specific dependencies if not using Vite
   if (bundler !== 'vite') {
@@ -90,8 +99,7 @@ async function configureBundler(targetPath, bundler, routingType) {
 
     switch (bundler) {
     case 'vite':
-      // Vite configuration
-      const viteConfigPath = path.join(targetPath, 'vite.config.ts');
+      // Copy static Vite configuration files
       if (routingType === 'v7') {
         // React Router v7+ config will be written later in the code
         // Just ensure vite is in dependencies here
@@ -102,16 +110,26 @@ async function configureBundler(targetPath, bundler, routingType) {
         packageJson.devDependencies['@vitejs/plugin-react'] = '^4.2.1';
         // Scripts will be updated by React Router v7+ setup
       } else {
-        // Standard Vite config
-        const viteConfigContent = `import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react()],
-})
-`;
-        await fs.writeFile(viteConfigPath, viteConfigContent, 'utf-8');
+        // Copy static config files
+        if (await fs.pathExists(configPath)) {
+          const viteConfigSrc = path.join(configPath, 'vite.config.ts');
+          const tsconfigSrc = path.join(configPath, 'tsconfig.json');
+          const tsconfigNodeSrc = path.join(configPath, 'tsconfig.node.json');
+          const postcssConfigSrc = path.join(configPath, 'postcss.config.js');
+          
+          if (await fs.pathExists(viteConfigSrc)) {
+            await fs.copy(viteConfigSrc, path.join(targetPath, 'vite.config.ts'));
+          }
+          if (await fs.pathExists(tsconfigSrc)) {
+            await fs.copy(tsconfigSrc, path.join(targetPath, 'tsconfig.json'));
+          }
+          if (await fs.pathExists(tsconfigNodeSrc)) {
+            await fs.copy(tsconfigNodeSrc, path.join(targetPath, 'tsconfig.node.json'));
+          }
+          if (await fs.pathExists(postcssConfigSrc)) {
+            await fs.copy(postcssConfigSrc, path.join(targetPath, 'postcss.config.js'));
+          }
+        }
         
         if (!packageJson.devDependencies) {
           packageJson.devDependencies = {};
@@ -126,161 +144,29 @@ export default defineConfig({
         packageJson.scripts['build'] = 'tsc && vite build';
         packageJson.scripts['preview'] = 'vite preview';
       }
-      console.log(chalk.green('✅ Configured Vite'));
+      console.log(chalk.green('✅ Configured Vite (using static config files)'));
       break;
 
     case 'webpack':
       // Webpack configuration - remove "type": "module" since webpack.config.js uses CommonJS
       delete packageJson.type;
       
-      const webpackConfigPath = path.join(targetPath, 'webpack.config.js');
-      const webpackConfigContent = `const path = require('path');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
-const CopyWebpackPlugin = require('copy-webpack-plugin');
-const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-
-const isProduction = process.env.NODE_ENV === 'production';
-
-module.exports = {
-  entry: './src/main.tsx',
-  mode: isProduction ? 'production' : 'development',
-  module: {
-    rules: [
-      {
-        test: /\\.tsx?$/,
-        use: {
-          loader: 'ts-loader',
-          options: {
-            transpileOnly: false,
-            configFile: 'tsconfig.json',
-            compilerOptions: {
-              noEmit: false, // Override noEmit for ts-loader
-            },
-          },
-        },
-        exclude: /node_modules/,
-      },
-      {
-        test: /\\.(scss|sass)$/i,
-        use: [
-          isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
-          {
-            loader: 'css-loader',
-            options: {
-              importLoaders: 2,
-              sourceMap: !isProduction,
-            },
-          },
-          {
-            loader: 'postcss-loader',
-            options: {
-              // postcss-loader will auto-detect postcss.config.js if it exists
-              // It handles both CommonJS and ES module formats
-              sourceMap: !isProduction,
-            },
-          },
-          {
-            loader: 'sass-loader',
-            options: {
-              sourceMap: !isProduction,
-              sassOptions: {
-                outputStyle: isProduction ? 'compressed' : 'expanded',
-              },
-            },
-          },
-        ],
-      },
-      {
-        test: /\\.css$/i,
-        use: [
-          isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
-          {
-            loader: 'css-loader',
-            options: {
-              importLoaders: 1,
-              sourceMap: !isProduction,
-            },
-          },
-          {
-            loader: 'postcss-loader',
-            options: {
-              // postcss-loader will auto-detect postcss.config.js if it exists
-              // It handles both CommonJS and ES module formats
-              sourceMap: !isProduction,
-            },
-          },
-        ],
-      },
-      {
-        test: /\\.(png|jpe?g|gif|svg)$/i,
-        type: 'asset/resource',
-      },
-    ],
-  },
-  resolve: {
-    extensions: ['.tsx', '.ts', '.js', '.jsx'],
-  },
-  output: {
-    filename: isProduction ? 'js/[name].[contenthash].js' : 'js/[name].js',
-    path: path.resolve(__dirname, 'dist'),
-    clean: true,
-    publicPath: '/',
-  },
-  plugins: [
-    new HtmlWebpackPlugin({
-      template: './index.html',
-      minify: isProduction,
-    }),
-    new CopyWebpackPlugin({
-      patterns: [
-        {
-          from: 'public',
-          to: '.',
-          noErrorOnMissing: true,
-        },
-      ],
-    }),
-    ...(isProduction
-      ? [
-          new MiniCssExtractPlugin({
-            filename: 'css/[name].[contenthash].css',
-            chunkFilename: 'css/[name].[contenthash].chunk.css',
-          }),
-        ]
-      : []),
-  ],
-  devServer: {
-    static: [
-      {
-        directory: path.join(__dirname, 'public'),
-        publicPath: '/',
-      },
-    ],
-    historyApiFallback: true,
-    port: 3000,
-    hot: true,
-    open: true,
-    compress: true,
-  },
-  devtool: isProduction ? 'source-map' : 'eval-source-map',
-  optimization: {
-    minimize: isProduction,
-    splitChunks: isProduction
-      ? {
-          chunks: 'all',
-          cacheGroups: {
-            vendor: {
-              test: /[\\\\/]node_modules[\\\\/]/,
-              name: 'vendors',
-              priority: 10,
-            },
-          },
+      // Copy static config files
+      if (await fs.pathExists(configPath)) {
+        const webpackConfigSrc = path.join(configPath, 'webpack.config.js');
+        const tsconfigSrc = path.join(configPath, 'tsconfig.json');
+        const postcssConfigSrc = path.join(configPath, 'postcss.config.js');
+        
+        if (await fs.pathExists(webpackConfigSrc)) {
+          await fs.copy(webpackConfigSrc, path.join(targetPath, 'webpack.config.js'));
         }
-      : false,
-  },
-};
-`;
-      await fs.writeFile(webpackConfigPath, webpackConfigContent, 'utf-8');
+        if (await fs.pathExists(tsconfigSrc)) {
+          await fs.copy(tsconfigSrc, path.join(targetPath, 'tsconfig.json'));
+        }
+        if (await fs.pathExists(postcssConfigSrc)) {
+          await fs.copy(postcssConfigSrc, path.join(targetPath, 'postcss.config.js'));
+        }
+      }
       
       if (!packageJson.devDependencies) {
         packageJson.devDependencies = {};
@@ -308,21 +194,17 @@ module.exports = {
       packageJson.scripts['build'] = 'tsc && webpack --mode production';
       packageJson.scripts['preview'] = 'webpack serve --mode production';
       
-      console.log(chalk.green('✅ Configured Webpack with SCSS and CSS extraction support'));
+      console.log(chalk.green('✅ Configured Webpack (using static config files)'));
       break;
 
     default:
       console.log(chalk.yellow(`⚠️  Unknown bundler: ${bundler}, defaulting to Vite`));
       // Fallback to Vite (should only be vite or webpack)
-      const defaultViteConfigPath = path.join(targetPath, 'vite.config.ts');
-      const defaultViteConfigContent = `import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-export default defineConfig({
-  plugins: [react()],
-})
-`;
-      await fs.writeFile(defaultViteConfigPath, defaultViteConfigContent, 'utf-8');
+      const defaultConfigPath = getConfigPath('vite', cssFramework);
+      const defaultViteConfigSrc = path.join(defaultConfigPath, 'vite.config.ts');
+      if (await fs.pathExists(defaultViteConfigSrc)) {
+        await fs.copy(defaultViteConfigSrc, path.join(targetPath, 'vite.config.ts'));
+      }
   }
 
   // Save updated package.json
@@ -389,10 +271,9 @@ export async function generateProject(targetPath, answers) {
     
     // Handle bundler-specific configuration (including tsconfig)
     console.log(chalk.blue(`⚙️  Configuring ${bundler} bundler...`));
-    await configureBundler(targetPath, bundler, routingType);
+    await configureBundler(targetPath, bundler, cssFramework, routingType);
     
-    // Create bundler-appropriate tsconfig.json
-    await createTypeScriptConfig(targetPath, bundler);
+    // Note: tsconfig.json is now copied from static configs, no need to generate
 
     // Copy base src directory
     const baseSrcPath = path.join(basePath, 'src');
@@ -699,23 +580,8 @@ export default {
 
     if (cssFramework === 'tailwind') {
       // Keep Tailwind - no changes needed
+      // postcss.config.js is already copied from static configs in configureBundler
       console.log(chalk.blue('✅ Tailwind CSS will be configured'));
-      
-      // Convert postcss.config.js to CommonJS format for webpack
-      if (bundler === 'webpack') {
-        const postcssConfigPath = path.join(targetPath, 'postcss.config.js');
-        if (await fs.pathExists(postcssConfigPath)) {
-          const postcssConfigContent = `module.exports = {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-};
-`;
-          await fs.writeFile(postcssConfigPath, postcssConfigContent, 'utf-8');
-          console.log(chalk.blue('✅ Converted postcss.config.js to CommonJS format for webpack'));
-        }
-      }
     } else {
       // Remove Tailwind files if not selected
       const tailwindFiles = [
@@ -731,19 +597,10 @@ export default {
       // Remove Tailwind from package.json (but keep postcss and autoprefixer for webpack)
       delete packageJson.devDependencies?.tailwindcss;
       
-      // For webpack, we need postcss.config.js with autoprefixer (without Tailwind)
+      // postcss.config.js is already copied from static configs in configureBundler
+      // Just ensure dependencies are correct
       if (bundler === 'webpack') {
-        const postcssConfigPath = path.join(targetPath, 'postcss.config.js');
-        const postcssConfigContent = `module.exports = {
-  plugins: {
-    autoprefixer: {},
-  },
-};
-`;
-        await fs.writeFile(postcssConfigPath, postcssConfigContent, 'utf-8');
-        console.log(chalk.blue('✅ Created postcss.config.js with autoprefixer for webpack'));
-        
-        // Ensure postcss and autoprefixer are in devDependencies
+        // Ensure postcss and autoprefixer are in devDependencies for webpack
         if (!packageJson.devDependencies) {
           packageJson.devDependencies = {};
         }
@@ -774,23 +631,26 @@ export default {
         }
         packageJson.devDependencies['sass'] = '^1.69.0';
 
-        // Create or convert index.css to index.scss
+        // Copy static SCSS file from configs
+        const configPath = getConfigPath(bundler, 'sass');
+        const scssSrc = path.join(configPath, 'index.scss');
         const cssPath = path.join(targetSrcPath, 'index.css');
         const scssPath = path.join(targetSrcPath, 'index.scss');
         
-        let scssContent = '';
-        
+        // Remove old CSS file if it exists
         if (await fs.pathExists(cssPath)) {
-          // Read existing CSS content (remove Tailwind directives if present)
-          scssContent = await fs.readFile(cssPath, 'utf-8');
-          scssContent = scssContent.replace(/@tailwind\s+[^;]+;/g, '');
-          scssContent = scssContent.trim();
+          await fs.remove(cssPath);
+          console.log(chalk.blue(`🗑️  Removed old ${path.basename(cssPath)}`));
         }
         
-        // If empty or only had Tailwind, add basic SCSS structure with SCSS features
-        if (!scssContent || scssContent.trim().length === 0) {
-          scssContent = `// Main stylesheet
-// This file will be compiled to CSS by Vite
+        // Copy static SCSS file
+        if (await fs.pathExists(scssSrc)) {
+          await fs.copy(scssSrc, scssPath);
+          console.log(chalk.green(`✅ Copied ${path.basename(scssPath)} from static configs`));
+        } else {
+          // Fallback: create basic SCSS if static file doesn't exist
+          const scssContent = `// Main stylesheet
+// This file will be compiled to CSS
 
 // SCSS Variables
 $font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -813,28 +673,9 @@ body {
 
 // Add your SCSS styles below
 `;
-        }
-        
-        // Ensure SCSS file is created - remove CSS file first (if it exists) to avoid conflicts
-        if (await fs.pathExists(cssPath)) {
-          await fs.remove(cssPath);
-          console.log(chalk.blue(`🗑️  Removed old ${path.basename(cssPath)}`));
-        }
-        
-        // Write SCSS file - ensure it's always created
-        await fs.ensureDir(path.dirname(scssPath));
-        await fs.writeFile(scssPath, scssContent, 'utf-8');
-        
-        // Verify SCSS file was created and has content
-        if (await fs.pathExists(scssPath)) {
-          const writtenContent = await fs.readFile(scssPath, 'utf-8');
-          if (writtenContent.trim().length > 0) {
-            console.log(chalk.green(`✅ Created ${path.basename(scssPath)} with ${writtenContent.split('\n').length} lines`));
-          } else {
-            console.log(chalk.yellow(`⚠️  Created ${path.basename(scssPath)} but file appears empty`));
-          }
-        } else {
-          console.log(chalk.red(`❌ Failed to create ${path.basename(scssPath)}`));
+          await fs.ensureDir(path.dirname(scssPath));
+          await fs.writeFile(scssPath, scssContent, 'utf-8');
+          console.log(chalk.green(`✅ Created ${path.basename(scssPath)}`));
         }
 
         // Update main.tsx (v6) or root layout (v7+) to import .scss instead of .css

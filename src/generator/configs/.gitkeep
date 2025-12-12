@@ -1,0 +1,4 @@
+# This directory contains template configuration files
+# TypeScript errors in these files are expected - they are templates
+# that will be copied to actual projects where the errors will resolve
+

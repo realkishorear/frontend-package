@@ -153,27 +153,41 @@ async function configureBundler(targetPath, bundler, cssFramework, routingType) 
       // Webpack configuration - remove "type": "module" since webpack.config.js uses CommonJS
       delete packageJson.type;
       
-      // Copy static config files
-      if (await fs.pathExists(configPath)) {
-        const webpackConfigSrc = path.join(configPath, 'webpack.config.js');
-        const tsconfigSrc = path.join(configPath, 'tsconfig.json');
-        const postcssConfigSrc = path.join(configPath, 'postcss.config.js');
-        
-        if (await fs.pathExists(webpackConfigSrc)) {
-          await fs.copy(webpackConfigSrc, path.join(targetPath, 'webpack.config.js'));
-          console.log(chalk.green('✅ Copied webpack.config.js'));
-        } else {
-          console.log(chalk.yellow(`⚠️  webpack.config.js not found at: ${webpackConfigSrc}`));
+      // Copy static config files - try multiple path resolutions
+      const possibleConfigPaths = [
+        configPath, // Primary path
+        path.join(__dirname, 'configs', `${bundler}-${cssFramework}`), // Direct path
+        path.resolve(__dirname, 'configs', `${bundler}-${cssFramework}`), // Resolved path
+      ];
+      
+      let configFound = false;
+      for (const tryConfigPath of possibleConfigPaths) {
+        if (await fs.pathExists(tryConfigPath)) {
+          const webpackConfigSrc = path.join(tryConfigPath, 'webpack.config.js');
+          const tsconfigSrc = path.join(tryConfigPath, 'tsconfig.json');
+          const postcssConfigSrc = path.join(tryConfigPath, 'postcss.config.js');
+          
+          if (await fs.pathExists(webpackConfigSrc)) {
+            await fs.copy(webpackConfigSrc, path.join(targetPath, 'webpack.config.js'));
+            console.log(chalk.green('✅ Copied webpack.config.js'));
+            configFound = true;
+          }
+          if (await fs.pathExists(tsconfigSrc)) {
+            await fs.copy(tsconfigSrc, path.join(targetPath, 'tsconfig.json'));
+          }
+          if (await fs.pathExists(postcssConfigSrc)) {
+            await fs.copy(postcssConfigSrc, path.join(targetPath, 'postcss.config.js'));
+          }
+          break; // Found config, exit loop
         }
-        if (await fs.pathExists(tsconfigSrc)) {
-          await fs.copy(tsconfigSrc, path.join(targetPath, 'tsconfig.json'));
-        }
-        if (await fs.pathExists(postcssConfigSrc)) {
-          await fs.copy(postcssConfigSrc, path.join(targetPath, 'postcss.config.js'));
-        }
-      } else {
-        console.log(chalk.yellow(`⚠️  Config path not found: ${configPath}`));
+      }
+      
+      if (!configFound) {
+        console.log(chalk.red(`❌ ERROR: Could not find webpack config for ${bundler}-${cssFramework}`));
+        console.log(chalk.yellow(`   Tried paths:`));
+        possibleConfigPaths.forEach(p => console.log(chalk.yellow(`     - ${p}`)));
         console.log(chalk.yellow(`   __dirname: ${__dirname}`));
+        throw new Error(`Webpack configuration not found for ${bundler}-${cssFramework}`);
       }
       
       if (!packageJson.devDependencies) {

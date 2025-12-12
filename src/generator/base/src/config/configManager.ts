@@ -134,4 +134,3 @@ export function getConfigManager(configPath?: string): ConfigManager {
 }
 
 export default ConfigManager;
-

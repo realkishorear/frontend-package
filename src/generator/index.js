@@ -339,12 +339,12 @@ export async function generateProject(targetPath, answers) {
     bundler = 'vite';
   }
   
-  // Dashboard and Landing templates require Tailwind CSS
-  // Auto-switch to Tailwind if user selected a different CSS framework
+  // Dashboard and Landing templates use Tailwind utility classes
+  // Show warning but allow user's CSS framework choice
   if ((template === 'dashboard' || template === 'landing') && cssFramework !== 'tailwind') {
-    console.log(chalk.yellow(`\n⚠️  Warning: ${template === 'dashboard' ? 'Dashboard' : 'Landing'} template requires Tailwind CSS.`));
-    console.log(chalk.yellow(`   Automatically switching to Tailwind CSS for proper styling.\n`));
-    cssFramework = 'tailwind';
+    console.log(chalk.yellow(`\n⚠️  Warning: ${template === 'dashboard' ? 'Dashboard' : 'Landing'} template uses Tailwind utility classes.`));
+    console.log(chalk.yellow(`   You've selected ${cssFramework.toUpperCase()}, so you'll need to replace Tailwind classes with your own styling.`));
+    console.log(chalk.yellow(`   Proceeding with ${cssFramework.toUpperCase()} as requested...\n`));
   }
 
   try {
@@ -719,8 +719,7 @@ export default {
     } else {
       // Remove Tailwind files if not selected
       const tailwindFiles = [
-        'tailwind.config.js',
-        'postcss.config.js'
+        'tailwind.config.js'
       ];
       for (const file of tailwindFiles) {
         const filePath = path.join(targetPath, file);
@@ -729,10 +728,41 @@ export default {
         }
       }
 
-      // Remove Tailwind from package.json
+      // Remove Tailwind from package.json (but keep postcss and autoprefixer for webpack)
       delete packageJson.devDependencies?.tailwindcss;
-      delete packageJson.devDependencies?.autoprefixer;
-      delete packageJson.devDependencies?.postcss;
+      
+      // For webpack, we need postcss.config.js with autoprefixer (without Tailwind)
+      if (bundler === 'webpack') {
+        const postcssConfigPath = path.join(targetPath, 'postcss.config.js');
+        const postcssConfigContent = `module.exports = {
+  plugins: {
+    autoprefixer: {},
+  },
+};
+`;
+        await fs.writeFile(postcssConfigPath, postcssConfigContent, 'utf-8');
+        console.log(chalk.blue('✅ Created postcss.config.js with autoprefixer for webpack'));
+        
+        // Ensure postcss and autoprefixer are in devDependencies
+        if (!packageJson.devDependencies) {
+          packageJson.devDependencies = {};
+        }
+        if (!packageJson.devDependencies['postcss']) {
+          packageJson.devDependencies['postcss'] = '^8.4.32';
+        }
+        if (!packageJson.devDependencies['autoprefixer']) {
+          packageJson.devDependencies['autoprefixer'] = '^10.4.16';
+        }
+      } else {
+        // For Vite, remove postcss.config.js if it exists (Vite handles PostCSS differently)
+        const postcssConfigPath = path.join(targetPath, 'postcss.config.js');
+        if (await fs.pathExists(postcssConfigPath)) {
+          await fs.remove(postcssConfigPath);
+        }
+        // Remove postcss and autoprefixer from package.json for Vite (not needed)
+        delete packageJson.devDependencies?.autoprefixer;
+        delete packageJson.devDependencies?.postcss;
+      }
 
       if (cssFramework === 'sass') {
         // Handle SASS

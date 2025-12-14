@@ -235,14 +235,327 @@ async function configureBundler(targetPath, bundler, cssFramework, routingType) 
   await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
 }
 
+/**
+ * Generate Angular project
+ */
+async function generateAngularProject(targetPath, answers) {
+  const { cssFramework, componentLibrary, stateManagement, template } = answers;
+  const projectName = path.basename(targetPath);
+  const styleExt = cssFramework === 'scss' ? 'scss' : 'css';
+  
+  console.log(chalk.blue('🅰️  Generating Angular project...\n'));
+  
+  try {
+    await fs.ensureDir(targetPath);
+    
+    // Create package.json
+    const packageJson = {
+      name: projectName,
+      version: '0.0.0',
+      scripts: {
+        ng: 'ng',
+        start: 'ng serve',
+        build: 'ng build',
+        watch: 'ng build --watch --configuration development',
+        test: 'ng test'
+      },
+      private: true,
+      dependencies: {
+        '@angular/animations': '^17.0.0',
+        '@angular/common': '^17.0.0',
+        '@angular/compiler': '^17.0.0',
+        '@angular/core': '^17.0.0',
+        '@angular/forms': '^17.0.0',
+        '@angular/platform-browser': '^17.0.0',
+        '@angular/platform-browser-dynamic': '^17.0.0',
+        '@angular/router': '^17.0.0',
+        'rxjs': '~7.8.0',
+        'tslib': '^2.3.0',
+        'zone.js': '~0.14.2'
+      },
+      devDependencies: {
+        '@angular-devkit/build-angular': '^17.0.0',
+        '@angular/cli': '^17.0.0',
+        '@angular/compiler-cli': '^17.0.0',
+        '@types/jasmine': '~5.1.0',
+        'jasmine-core': '~5.1.0',
+        'karma': '~6.4.0',
+        'karma-chrome-launcher': '~3.2.0',
+        'karma-coverage': '~2.2.0',
+        'karma-jasmine': '~5.1.0',
+        'karma-jasmine-html-reporter': '~2.1.0',
+        'typescript': '~5.2.2'
+      }
+    };
+    
+    // Add Angular Material if selected
+    if (componentLibrary === 'mui') {
+      packageJson.dependencies['@angular/material'] = '^17.0.0';
+      packageJson.dependencies['@angular/cdk'] = '^17.0.0';
+    }
+    
+    // Add NgRx if Redux selected
+    if (stateManagement === 'redux') {
+      packageJson.dependencies['@ngrx/store'] = '^17.0.0';
+      packageJson.dependencies['@ngrx/effects'] = '^17.0.0';
+      packageJson.devDependencies['@ngrx/store-devtools'] = '^17.0.0';
+    }
+    
+    await fs.writeJson(path.join(targetPath, 'package.json'), packageJson, { spaces: 2 });
+    console.log(chalk.green('✅ Created package.json\n'));
+    
+    // Create angular.json
+    const angularJson = {
+      '$schema': './node_modules/@angular/cli/lib/config/schema.json',
+      'version': 1,
+      'newProjectRoot': 'projects',
+      'projects': {
+        [projectName]: {
+          'projectType': 'application',
+          'schematics': {
+            '@schematics/angular:component': {
+              'style': styleExt
+            }
+          },
+          'root': '',
+          'sourceRoot': 'src',
+          'prefix': 'app',
+          'architect': {
+            'build': {
+              'builder': '@angular-devkit/build-angular:browser',
+              'options': {
+                'outputPath': 'dist/' + projectName,
+                'index': 'src/index.html',
+                'main': 'src/main.ts',
+                'polyfills': ['zone.js'],
+                'tsConfig': 'tsconfig.app.json',
+                'assets': ['src/favicon.ico', 'src/assets'],
+                'styles': [`src/styles.${styleExt}`],
+                'scripts': []
+              }
+            },
+            'serve': {
+              'builder': '@angular-devkit/build-angular:dev-server',
+              'options': {
+                'buildTarget': projectName + ':build'
+              }
+            }
+          }
+        }
+      }
+    };
+    await fs.writeJson(path.join(targetPath, 'angular.json'), angularJson, { spaces: 2 });
+    console.log(chalk.green('✅ Created angular.json\n'));
+    
+    // Create tsconfig files
+    const tsConfig = {
+      compileOnSave: false,
+      compilerOptions: {
+        outDir: './dist/out-tsc',
+        forceConsistentCasingInFileNames: true,
+        strict: true,
+        noImplicitOverride: true,
+        noPropertyAccessFromIndexSignature: true,
+        noImplicitReturns: true,
+        noFallthroughCasesInSwitch: true,
+        skipLibCheck: true,
+        esModuleInterop: true,
+        sourceMap: true,
+        declaration: false,
+        experimentalDecorators: true,
+        moduleResolution: 'node',
+        importHelpers: true,
+        target: 'ES2022',
+        module: 'ES2022',
+        lib: ['ES2022', 'dom']
+      },
+      angularCompilerOptions: {
+        enableI18nLegacyMessageIdFormat: false,
+        strictInjectionParameters: true,
+        strictInputAccessModifiers: true,
+        strictTemplates: true
+      }
+    };
+    await fs.writeJson(path.join(targetPath, 'tsconfig.json'), tsConfig, { spaces: 2 });
+    
+    const tsConfigApp = { ...tsConfig, extends: './tsconfig.json', compilerOptions: { outDir: './out-tsc/app' }, files: ['src/main.ts'], include: ['src/**/*.d.ts'] };
+    await fs.writeJson(path.join(targetPath, 'tsconfig.app.json'), tsConfigApp, { spaces: 2 });
+    console.log(chalk.green('✅ Created TypeScript configs\n'));
+    
+    // Create src directory structure
+    const srcPath = path.join(targetPath, 'src');
+    await fs.ensureDir(srcPath);
+    await fs.ensureDir(path.join(srcPath, 'app'));
+    await fs.ensureDir(path.join(srcPath, 'assets'));
+    
+    // Create index.html
+    const indexHtml = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${projectName}</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+</head>
+<body>
+  <app-root></app-root>
+</body>
+</html>`;
+    await fs.writeFile(path.join(srcPath, 'index.html'), indexHtml);
+    
+    // Create main.ts
+    const mainTs = `import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
+import { AppModule } from './app/app.module';
+
+platformBrowserDynamic().bootstrapModule(AppModule)
+  .catch(err => console.error(err));`;
+    await fs.writeFile(path.join(srcPath, 'main.ts'), mainTs);
+    
+    // Create styles file
+    const stylesContent = styleExt === 'scss' 
+      ? `/* Global Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}`
+      : `/* Global Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}`;
+    await fs.writeFile(path.join(srcPath, `styles.${styleExt}`), stylesContent);
+    
+    // Create app.module.ts
+    let appModuleImports = `import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { AppRoutingModule } from './app-routing.module';
+import { AppComponent } from './app.component';`;
+    
+    if (componentLibrary === 'mui') {
+      appModuleImports += `\n// Angular Material imports will be added here after running: ng add @angular/material`;
+    }
+    
+    if (stateManagement === 'redux') {
+      appModuleImports += `\n// NgRx imports will be added here after running: ng add @ngrx/store`;
+    }
+    
+    const appModule = `${appModuleImports}
+
+@NgModule({
+  declarations: [
+    AppComponent
+  ],
+  imports: [
+    BrowserModule,
+    BrowserAnimationsModule,
+    AppRoutingModule${componentLibrary === 'mui' ? ',\n    // Add Angular Material modules here' : ''}${stateManagement === 'redux' ? ',\n    // Add NgRx StoreModule here' : ''}
+  ],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }`;
+    await fs.writeFile(path.join(srcPath, 'app', 'app.module.ts'), appModule);
+    
+    // Create app.component.ts
+    const appComponent = `import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.${styleExt}']
+})
+export class AppComponent {
+  title = '${projectName}';
+}`;
+    await fs.writeFile(path.join(srcPath, 'app', 'app.component.ts'), appComponent);
+    
+    // Create app.component.html
+    const appComponentHtml = template === 'dashboard' 
+      ? `<div class="app-container">
+  <h1>Welcome to ${projectName}</h1>
+  <p>Dashboard template - customize this component to build your dashboard.</p>
+</div>`
+      : `<div class="app-container">
+  <h1>Welcome to ${projectName}</h1>
+  <p>Start building your Angular application!</p>
+</div>`;
+    await fs.writeFile(path.join(srcPath, 'app', 'app.component.html'), appComponentHtml);
+    
+    // Create app.component styles
+    await fs.writeFile(path.join(srcPath, 'app', `app.component.${styleExt}`), `.app-container {
+  padding: 20px;
+}`);
+    
+    // Create app-routing.module.ts
+    const appRouting = `import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+
+const routes: Routes = [];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule { }`;
+    await fs.writeFile(path.join(srcPath, 'app', 'app-routing.module.ts'), appRouting);
+    
+    console.log(chalk.green('✅ Created Angular project structure\n'));
+    
+    // Install dependencies
+    console.log(chalk.blue('📦 Installing dependencies...\n'));
+    await installDependencies(targetPath);
+    console.log(chalk.green('✅ Dependencies installed!\n'));
+    
+    console.log(chalk.green('✅ Angular project generated successfully!\n'));
+    console.log(chalk.cyan('📝 Next steps:'));
+    if (targetPath !== process.cwd()) {
+      console.log(chalk.white(`   cd ${path.basename(targetPath)}`));
+    }
+    console.log(chalk.white('   npm start'));
+    if (componentLibrary === 'mui') {
+      console.log(chalk.cyan('   ng add @angular/material'));
+    }
+    if (stateManagement === 'redux') {
+      console.log(chalk.cyan('   ng add @ngrx/store'));
+    }
+    console.log(chalk.white('\n🎉 Happy coding!\n'));
+    
+  } catch (error) {
+    console.error(chalk.red(`❌ Error generating Angular project: ${error.message}`));
+    throw error;
+  }
+}
+
 export async function generateProject(targetPath, answers) {
   // Map new answer structure to generator expectations
   const { framework, cssFramework: cssFrameworkRaw, componentLibrary: componentLibraryRaw, bundler, stateManagement, template: templateRaw } = answers;
   
-  // Only support React for now (Angular support can be added later)
-  if (framework !== 'react') {
-    throw new Error(`Framework "${framework}" is not yet supported. Only React is currently supported.`);
+  // Route to appropriate generator based on framework
+  if (framework === 'angular') {
+    return await generateAngularProject(targetPath, answers);
   }
+  
+  // React project generation (existing code)
   
   // Map template: 'none' -> 'empty'
   const template = templateRaw === 'none' ? 'empty' : templateRaw;

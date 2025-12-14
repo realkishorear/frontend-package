@@ -69,7 +69,9 @@ async function createTypeScriptConfig(targetPath, bundler) {
 
 function getConfigPath(bundler, cssFramework) {
   // Map bundler + CSS framework to config directory
-  const configDir = path.join(__dirname, 'configs', `${bundler}-${cssFramework}`);
+  // Note: CSS framework 'sass' maps to directory 'scss'
+  const cssDirName = cssFramework === 'sass' ? 'scss' : cssFramework;
+  const configDir = path.join(__dirname, 'configs', `${bundler}-${cssDirName}`);
   return configDir;
 }
 
@@ -234,19 +236,41 @@ async function configureBundler(targetPath, bundler, cssFramework, routingType) 
 }
 
 export async function generateProject(targetPath, answers) {
-  let { template, bundler, cssFramework, componentLibrary, useRedux, useReactQuery, useLogger, useAnimation, routingType } = answers;
+  // Map new answer structure to generator expectations
+  const { framework, cssFramework: cssFrameworkRaw, componentLibrary: componentLibraryRaw, bundler, stateManagement, template: templateRaw } = answers;
   
-  // React Router v7+ requires Vite
-  if (routingType === 'v7' && bundler !== 'vite') {
-    console.log(chalk.yellow(`\n⚠️ Warning: React Router v7+ requires Vite as the bundler.`));
-    console.log(chalk.yellow(`   Automatically switching to Vite for proper routing support.\n`));
-    bundler = 'vite';
+  // Only support React for now (Angular support can be added later)
+  if (framework !== 'react') {
+    throw new Error(`Framework "${framework}" is not yet supported. Only React is currently supported.`);
   }
   
-  // Dashboard and Landing templates use Tailwind utility classes
+  // Map template: 'none' -> 'empty'
+  const template = templateRaw === 'none' ? 'empty' : templateRaw;
+  
+  // Map CSS framework: 'scss' -> 'sass' (generator uses 'sass')
+  const cssFramework = cssFrameworkRaw === 'scss' ? 'sass' : cssFrameworkRaw;
+  
+  // Map component library: 'plain' -> 'none'
+  const componentLibrary = componentLibraryRaw === 'plain' ? 'none' : componentLibraryRaw;
+  
+  // Map state management: 'redux' -> useRedux boolean
+  const useRedux = stateManagement === 'redux';
+  
+  // Set defaults for removed features
+  const useReactQuery = false;
+  const useLogger = false;
+  const useAnimation = false;
+  const routingType = 'v6'; // Default to v6, no longer asking user
+  
+  // Ensure bundler is set for React
+  if (!bundler) {
+    throw new Error('Bundler is required for React projects');
+  }
+  
+  // Dashboard template uses Tailwind utility classes
   // Show warning but allow user's CSS framework choice
-  if ((template === 'dashboard' || template === 'landing') && cssFramework !== 'tailwind') {
-    console.log(chalk.yellow(`\n⚠️  Warning: ${template === 'dashboard' ? 'Dashboard' : 'Landing'} template uses Tailwind utility classes.`));
+  if (template === 'dashboard' && cssFramework !== 'tailwind') {
+    console.log(chalk.yellow(`\n⚠️  Warning: Dashboard template uses Tailwind utility classes.`));
     console.log(chalk.yellow(`   You've selected ${cssFramework.toUpperCase()}, so you'll need to replace Tailwind classes with your own styling.`));
     console.log(chalk.yellow(`   Proceeding with ${cssFramework.toUpperCase()} as requested...\n`));
   }

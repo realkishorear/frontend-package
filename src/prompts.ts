@@ -2,205 +2,116 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 import type { ProjectAnswers } from './types/index.js';
 
-// Logo/Icon mappings
-const logos = {
-  tailwind: '📦',
-  sass: '📦',
-  css: '📦',
-  mui: '📦',
-  antd: '📦',
-  shadcn: '📦',
-  none: '📦',
-  redux: '📦',
-  reactQuery: '📦',
-  logger: '📦',
-  animation: '📦',
-  router: '📦',
-  vite: '⚡',
-  webpack: '📦',
-} as const;
-
 /**
  * Interactive prompts to gather project configuration from the user
  * @returns Project configuration answers
  */
 export async function askQuestions(): Promise<ProjectAnswers> {
   try {
-    // First question: Application type
-    const templateAnswer = await inquirer.prompt<{ template: ProjectAnswers['template'] }>([
+    // Question 1: Framework
+    const frameworkAnswer = await inquirer.prompt<{ framework: ProjectAnswers['framework'] }>([
       {
         type: 'list',
-        name: 'template',
-        message: chalk.cyan.bold('\nChoose what kind of application you want to build:'),
+        name: 'framework',
+        message: chalk.cyan.bold('\nWhich framework you want to use:'),
         choices: [
-          { name: '📊 Dashboard', value: 'dashboard' },
-          { name: '🌐 Website', value: 'landing' },
-          { name: '📝 Different (Plain)', value: 'empty' },
+          { name: '⚛️  React', value: 'react' },
+          { name: '🅰️  Angular', value: 'angular' },
         ],
       },
     ]);
 
-    // Second question: Bundler
-    const bundlerAnswer = await inquirer.prompt<{ bundler: ProjectAnswers['bundler'] }>([
-      {
-        type: 'list',
-        name: 'bundler',
-        message: chalk.cyan.bold('\nChoose a bundler:'),
-        choices: [
-          {
-            name: `${logos.vite} Vite ${chalk.gray('(Fast & Modern)')}`,
-            value: 'vite',
-            short: 'Vite',
-          },
-          {
-            name: `${logos.webpack} Webpack ${chalk.gray('(Mature & Flexible)')}`,
-            value: 'webpack',
-            short: 'Webpack',
-          },
-        ],
-        default: 'vite',
-      },
-    ]);
+    // Question 2: CSS Library
+    const cssChoices: Array<{ name: string; value: ProjectAnswers['cssFramework']; short: string }> = [
+      { name: '🎨 Tailwind', value: 'tailwind', short: 'Tailwind' },
+      { name: '💅 CSS', value: 'css', short: 'CSS' },
+    ];
 
-    // Third question: CSS Framework
+    // Only show SCSS if Angular is chosen
+    if (frameworkAnswer.framework === 'angular') {
+      cssChoices.splice(1, 0, { name: '📦 Scss', value: 'scss', short: 'Scss' });
+    }
+
     const cssAnswer = await inquirer.prompt<{ cssFramework: ProjectAnswers['cssFramework'] }>([
       {
         type: 'list',
         name: 'cssFramework',
-        message: chalk.cyan.bold('\nChoose the CSS Framework:'),
-        choices: [
-          {
-            name: `${logos.tailwind} Tailwind ${chalk.gray('(Recommended)')}`,
-            value: 'tailwind',
-            short: 'Tailwind',
-          },
-          {
-            name: `${logos.sass} Sass`,
-            value: 'sass',
-            short: 'Sass',
-          },
-          {
-            name: `${logos.css} CSS`,
-            value: 'css',
-            short: 'CSS',
-          },
-        ],
-        default: 'tailwind',
+        message: chalk.cyan.bold('\nWhich CSS library do you prefer:'),
+        choices: cssChoices,
       },
     ]);
 
-    // Fourth question: Component Library (conditional based on CSS framework)
+    // Question 3: Component Library
     const componentChoices: Array<{ name: string; value: ProjectAnswers['componentLibrary']; short: string }> = [
-      {
-        name: `${logos.mui} Material UI`,
-        value: 'mui',
-        short: 'Material UI',
-      },
-      {
-        name: `${logos.antd} AntDesign`,
-        value: 'antd',
-        short: 'AntDesign',
-      },
+      { name: '📦 Material UI', value: 'mui', short: 'Material UI' },
     ];
 
-    // Only add Shadcn if Tailwind is selected
-    if (cssAnswer.cssFramework === 'tailwind') {
-      componentChoices.push({
-        name: `${logos.shadcn} Shadcn/ui ${chalk.gray('(Requires Tailwind)')}`,
-        value: 'shadcn',
-        short: 'Shadcn',
-      });
+    // Only show Shadcn if React is chosen
+    if (frameworkAnswer.framework === 'react') {
+      componentChoices.push({ name: '🎨 Shadcn', value: 'shadcn', short: 'Shadcn' });
     }
 
-    componentChoices.push({
-      name: `${logos.none} No library`,
-      value: 'none',
-      short: 'No library',
-    });
+    componentChoices.push({ name: '📝 Plain', value: 'plain', short: 'Plain' });
 
     const componentAnswer = await inquirer.prompt<{ componentLibrary: ProjectAnswers['componentLibrary'] }>([
       {
         type: 'list',
         name: 'componentLibrary',
-        message: chalk.cyan.bold('\nChoose component library:'),
+        message: chalk.cyan.bold('\nWhich component library you need to use:'),
         choices: componentChoices,
       },
     ]);
 
-    // Fifth question: Redux (with Thunk)
-    const reduxAnswer = await inquirer.prompt<{ useRedux: boolean }>([
-      {
-        type: 'confirm',
-        name: 'useRedux',
-        message: chalk.cyan.bold('\nDo you want to use Redux with Redux Thunk for state management?'),
-        default: false,
-      },
-    ]);
+    // Question 4: Bundler (only for React)
+    let bundlerAnswer: { bundler?: ProjectAnswers['bundler'] } = {};
+    if (frameworkAnswer.framework === 'react') {
+      bundlerAnswer = await inquirer.prompt<{ bundler: ProjectAnswers['bundler'] }>([
+        {
+          type: 'list',
+          name: 'bundler',
+          message: chalk.cyan.bold('\nWhich bundler you want to use:'),
+          choices: [
+            { name: '⚡ Vite', value: 'vite' },
+            { name: '📦 Webpack', value: 'webpack' },
+          ],
+        },
+      ]);
+    }
 
-    // Sixth question: TanStack Query
-    const reactQueryAnswer = await inquirer.prompt<{ useReactQuery: boolean }>([
-      {
-        type: 'confirm',
-        name: 'useReactQuery',
-        message: chalk.cyan.bold('\nDo you want to use TanStack Query for data fetching?'),
-        default: false,
-      },
-    ]);
-
-    // Seventh question: Logger (loglevel)
-    const loggerAnswer = await inquirer.prompt<{ useLogger: boolean }>([
-      {
-        type: 'confirm',
-        name: 'useLogger',
-        message: chalk.cyan.bold('\nDo you want to use loglevel for logging?'),
-        default: false,
-      },
-    ]);
-
-    // Eighth question: Animation Library (Framer Motion)
-    const animationAnswer = await inquirer.prompt<{ useAnimation: boolean }>([
-      {
-        type: 'confirm',
-        name: 'useAnimation',
-        message: chalk.cyan.bold('\nDo you want to use Framer Motion for animations?'),
-        default: false,
-      },
-    ]);
-
-    // Ninth question: Routing type
-    const routingAnswer = await inquirer.prompt<{ routingType: ProjectAnswers['routingType'] }>([
+    // Question 5: State Management
+    const stateManagementAnswer = await inquirer.prompt<{ stateManagement: ProjectAnswers['stateManagement'] }>([
       {
         type: 'list',
-        name: 'routingType',
-        message: chalk.cyan.bold('\nChoose routing approach:'),
+        name: 'stateManagement',
+        message: chalk.cyan.bold('\nDo you want to use state management:'),
         choices: [
-          {
-            name: `${logos.router} React Router v6 ${chalk.gray('(Manual Routes)')}`,
-            value: 'v6',
-            short: 'React Router v6',
-          },
-          {
-            name: `${logos.router} React Router v7+ ${chalk.gray('(File-based Routing)')} ${bundlerAnswer.bundler !== 'vite' ? chalk.red('(Requires Vite)') : ''}`,
-            value: 'v7',
-            short: 'React Router v7+',
-            disabled: bundlerAnswer.bundler !== 'vite',
-          },
+          { name: '🔄 Redux', value: 'redux' },
+          { name: '📝 Plain', value: 'plain' },
         ],
-        default: 'v6',
+      },
+    ]);
+
+    // Question 6: Template
+    const templateAnswer = await inquirer.prompt<{ template: ProjectAnswers['template'] }>([
+      {
+        type: 'list',
+        name: 'template',
+        message: chalk.cyan.bold('\nDo you want any Template:'),
+        choices: [
+          { name: '📊 Dashboard', value: 'dashboard' },
+          { name: '❌ No Templates', value: 'none' },
+        ],
       },
     ]);
 
     // Combine all answers
     const answers: ProjectAnswers = {
-      ...templateAnswer,
-      ...bundlerAnswer,
+      ...frameworkAnswer,
       ...cssAnswer,
       ...componentAnswer,
-      ...reduxAnswer,
-      ...reactQueryAnswer,
-      ...loggerAnswer,
-      ...animationAnswer,
-      ...routingAnswer,
+      ...bundlerAnswer,
+      ...stateManagementAnswer,
+      ...templateAnswer,
     };
 
     return answers;

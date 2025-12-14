@@ -20,7 +20,7 @@ export async function initProject(projectName: string): Promise<void> {
     console.log(chalk.cyan.bold('╚═══════════════════════════════════════════════════════╝\n'));
 
     // Ask interactive questions FIRST, before any validation or project creation
-    console.log(chalk.blue.bold('Let\'s set up your React project!\n'));
+    console.log(chalk.blue.bold('Let\'s set up your frontend project!\n'));
     console.log(chalk.gray('Please answer the following questions to configure your project:\n'));
     
     const answers = await askQuestions();
@@ -37,15 +37,14 @@ export async function initProject(projectName: string): Promise<void> {
 
     // Show summary of selections
     console.log(chalk.cyan.bold('\n📋 Project Configuration Summary:\n'));
-    console.log(chalk.white(`   Template: ${chalk.cyan(answers.template)}`));
-    console.log(chalk.white(`   Bundler: ${chalk.cyan(answers.bundler)}`));
+    console.log(chalk.white(`   Framework: ${chalk.cyan(answers.framework)}`));
     console.log(chalk.white(`   CSS Framework: ${chalk.cyan(answers.cssFramework)}`));
     console.log(chalk.white(`   Component Library: ${chalk.cyan(answers.componentLibrary)}`));
-    console.log(chalk.white(`   Routing: ${chalk.cyan(`React Router ${answers.routingType}`)}`));
-    if (answers.useRedux) console.log(chalk.white(`   ${chalk.green('✓')} Redux`));
-    if (answers.useReactQuery) console.log(chalk.white(`   ${chalk.green('✓')} React Query`));
-    if (answers.useLogger) console.log(chalk.white(`   ${chalk.green('✓')} Logger`));
-    if (answers.useAnimation) console.log(chalk.white(`   ${chalk.green('✓')} Framer Motion`));
+    if (answers.bundler) {
+      console.log(chalk.white(`   Bundler: ${chalk.cyan(answers.bundler)}`));
+    }
+    console.log(chalk.white(`   State Management: ${chalk.cyan(answers.stateManagement)}`));
+    console.log(chalk.white(`   Template: ${chalk.cyan(answers.template)}`));
     console.log(chalk.white(`\n   Target: ${chalk.cyan(targetPath)}\n`));
 
     logger.info('📁 Generating project...\n');

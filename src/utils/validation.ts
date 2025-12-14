@@ -1,24 +1,13 @@
 import { ValidationError } from './errors.js';
 import path from 'path';
 import fs from 'fs-extra';
-
-export interface ProjectAnswers {
-  template: string;
-  bundler: string;
-  cssFramework: string;
-  componentLibrary: string;
-  useRedux: boolean;
-  useReactQuery: boolean;
-  useLogger: boolean;
-  useAnimation: boolean;
-  routingType: string;
-}
+import type { ProjectAnswers } from '../types/index.js';
 
 /**
  * Validates project answers
  */
 export function validateAnswers(answers: Partial<ProjectAnswers>): asserts answers is ProjectAnswers {
-  const required = ['template', 'bundler', 'cssFramework', 'componentLibrary', 'routingType'];
+  const required = ['framework', 'cssFramework', 'componentLibrary', 'stateManagement', 'template'];
   const missing = required.filter((field) => !answers[field as keyof ProjectAnswers]);
 
   if (missing.length > 0) {
@@ -28,26 +17,34 @@ export function validateAnswers(answers: Partial<ProjectAnswers>): asserts answe
     );
   }
 
-  // Validate template
-  const validTemplates = ['dashboard', 'landing', 'empty'];
-  if (!validTemplates.includes(answers.template!)) {
+  // Validate framework
+  const validFrameworks = ['react', 'angular'];
+  if (!validFrameworks.includes(answers.framework!)) {
     throw new ValidationError(
-      `Invalid template: ${answers.template}. Must be one of: ${validTemplates.join(', ')}`,
-      'template'
+      `Invalid framework: ${answers.framework}. Must be one of: ${validFrameworks.join(', ')}`,
+      'framework'
     );
   }
 
-  // Validate bundler
-  const validBundlers = ['vite', 'webpack'];
-  if (!validBundlers.includes(answers.bundler!)) {
-    throw new ValidationError(
-      `Invalid bundler: ${answers.bundler}. Must be one of: ${validBundlers.join(', ')}`,
-      'bundler'
-    );
+  // Validate bundler (required only for React)
+  if (answers.framework === 'react') {
+    if (!answers.bundler) {
+      throw new ValidationError(
+        'Bundler is required for React projects',
+        'bundler'
+      );
+    }
+    const validBundlers = ['vite', 'webpack'];
+    if (!validBundlers.includes(answers.bundler)) {
+      throw new ValidationError(
+        `Invalid bundler: ${answers.bundler}. Must be one of: ${validBundlers.join(', ')}`,
+        'bundler'
+      );
+    }
   }
 
   // Validate CSS framework
-  const validCssFrameworks = ['tailwind', 'sass', 'css'];
+  const validCssFrameworks = ['tailwind', 'scss', 'css'];
   if (!validCssFrameworks.includes(answers.cssFramework!)) {
     throw new ValidationError(
       `Invalid CSS framework: ${answers.cssFramework}. Must be one of: ${validCssFrameworks.join(', ')}`,
@@ -55,8 +52,16 @@ export function validateAnswers(answers: Partial<ProjectAnswers>): asserts answe
     );
   }
 
+  // Validate SCSS only for Angular
+  if (answers.cssFramework === 'scss' && answers.framework !== 'angular') {
+    throw new ValidationError(
+      'SCSS is only available for Angular projects. Please select Angular or choose a different CSS framework.',
+      'cssFramework'
+    );
+  }
+
   // Validate component library
-  const validComponentLibraries = ['mui', 'antd', 'shadcn', 'none'];
+  const validComponentLibraries = ['mui', 'shadcn', 'plain'];
   if (!validComponentLibraries.includes(answers.componentLibrary!)) {
     throw new ValidationError(
       `Invalid component library: ${answers.componentLibrary}. Must be one of: ${validComponentLibraries.join(', ')}`,
@@ -64,12 +69,11 @@ export function validateAnswers(answers: Partial<ProjectAnswers>): asserts answe
     );
   }
 
-  // Validate routing type
-  const validRoutingTypes = ['v6', 'v7'];
-  if (!validRoutingTypes.includes(answers.routingType!)) {
+  // Validate Shadcn only for React
+  if (answers.componentLibrary === 'shadcn' && answers.framework !== 'react') {
     throw new ValidationError(
-      `Invalid routing type: ${answers.routingType}. Must be one of: ${validRoutingTypes.join(', ')}`,
-      'routingType'
+      'Shadcn is only available for React projects. Please select React or choose a different component library.',
+      'componentLibrary'
     );
   }
 
@@ -81,11 +85,21 @@ export function validateAnswers(answers: Partial<ProjectAnswers>): asserts answe
     );
   }
 
-  // Validate React Router v7 requires Vite
-  if (answers.routingType === 'v7' && answers.bundler !== 'vite') {
+  // Validate state management
+  const validStateManagement = ['redux', 'plain'];
+  if (!validStateManagement.includes(answers.stateManagement!)) {
     throw new ValidationError(
-      'React Router v7+ requires Vite as the bundler. Please select Vite.',
-      'routingType'
+      `Invalid state management: ${answers.stateManagement}. Must be one of: ${validStateManagement.join(', ')}`,
+      'stateManagement'
+    );
+  }
+
+  // Validate template
+  const validTemplates = ['dashboard', 'none'];
+  if (!validTemplates.includes(answers.template!)) {
+    throw new ValidationError(
+      `Invalid template: ${answers.template}. Must be one of: ${validTemplates.join(', ')}`,
+      'template'
     );
   }
 }

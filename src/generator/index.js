@@ -523,6 +523,27 @@ next-env.d.ts
           console.log(chalk.green('✅ Copied dashboard pages and added client directives\n'));
         }
         
+        // Create services directory and copy authService for Next.js compatibility
+        const servicesPath = path.join(srcPath, 'services');
+        await fs.ensureDir(servicesPath);
+        
+        // Copy authService from nextjs-auth template (it's compatible with dashboard Header component)
+        const nextjsAuthServicePath = path.join(__dirname, 'templates', 'nextjs-auth', 'services', 'authService.tsx');
+        if (await fs.pathExists(nextjsAuthServicePath)) {
+          await fs.copy(nextjsAuthServicePath, path.join(servicesPath, 'authService.tsx'));
+          console.log(chalk.green('✅ Copied authService for Next.js compatibility\n'));
+        }
+        
+        // Also copy OIDC config if it exists
+        const configPath = path.join(srcPath, 'config');
+        await fs.ensureDir(configPath);
+        
+        const dashboardConfigPath = path.join(dashboardTemplatePath, 'config');
+        if (await fs.pathExists(dashboardConfigPath)) {
+          await fs.copy(dashboardConfigPath, configPath);
+          console.log(chalk.green('✅ Copied OIDC config\n'));
+        }
+        
         // Create Dashboard Layout component (used by all routes)
         const dashboardLayoutContent = `'use client'
 

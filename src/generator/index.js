@@ -486,10 +486,8 @@ export default function RootLayout({
             sidebarContent = sidebarContent.replace(/location\.pathname/g, 'pathname');
             
             // Update Link component usage - Next.js Link needs href prop instead of to
-            sidebarContent = sidebarContent.replace(
-              /<Link\s+to="([^"]+)"([^>]*)>/g,
-              "<Link href=\"$1\"$2>"
-            );
+            // Simple and robust replacement: replace 'to=' with 'href=' (word boundary ensures we only match prop names)
+            sidebarContent = sidebarContent.replace(/\bto\s*=/g, 'href=');
             
             await fs.writeFile(sidebarPath, sidebarContent);
             console.log(chalk.green('✅ Updated Sidebar component for Next.js\n'));

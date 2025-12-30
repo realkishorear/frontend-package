@@ -424,31 +424,6 @@ next-env.d.ts
     await fs.writeFile(path.join(appPath, 'globals.css'), globalCss);
     console.log(chalk.green('✅ Created app/globals.css\n'));
     
-    // Create layout.tsx
-    const layoutContent = `import type { Metadata } from 'next'
-import './globals.css'
-
-export const metadata: Metadata = {
-  title: '${projectName}',
-  description: 'Generated with JGD FE CLI',
-}
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  )
-}
-`;
-    
-    await fs.writeFile(path.join(appPath, 'layout.tsx'), layoutContent);
-    console.log(chalk.green('✅ Created app/layout.tsx\n'));
-    
     // Create page.tsx based on template
     if (template === 'dashboard') {
       // Copy dashboard template
@@ -521,7 +496,7 @@ export default function RootLayout({
           console.log(chalk.green('✅ Copied dashboard components\n'));
         }
         
-        // Create pages directory for dashboard pages
+        // Create pages directory for dashboard pages (for component imports)
         const pagesPath = path.join(srcPath, 'pages');
         await fs.ensureDir(pagesPath);
         
@@ -531,15 +506,14 @@ export default function RootLayout({
           console.log(chalk.green('✅ Copied dashboard pages\n'));
         }
         
-        // Create a Next.js-compatible Dashboard component (without React Router)
-        const dashboardContent = `'use client'
+        // Create Dashboard Layout component (used by all routes)
+        const dashboardLayoutContent = `'use client'
 
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import Home from '@/pages/Home'
 
-export default function Dashboard() {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
 
@@ -581,7 +555,7 @@ export default function Dashboard() {
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 sm:p-6 lg:p-8">
-            <Home />
+            {children}
           </div>
         </main>
       </div>
@@ -590,21 +564,177 @@ export default function Dashboard() {
 }
 `;
         
-        await fs.writeFile(path.join(componentsPath, 'Dashboard.tsx'), dashboardContent);
-        console.log(chalk.green('✅ Created Dashboard component\n'));
+        await fs.writeFile(path.join(componentsPath, 'DashboardLayout.tsx'), dashboardLayoutContent);
+        console.log(chalk.green('✅ Created DashboardLayout component\n'));
         
-        // Create main page.tsx that uses Dashboard
-        const pageContent = `import Dashboard from '@/components/Dashboard'
+        // Create root layout with DashboardLayout
+        const layoutContent = `import type { Metadata } from 'next'
+import './globals.css'
+import DashboardLayout from '@/components/DashboardLayout'
 
-export default function Home() {
-  return <Dashboard />
+export const metadata: Metadata = {
+  title: '${projectName}',
+  description: 'Generated with JGD FE CLI',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <DashboardLayout>
+          {children}
+        </DashboardLayout>
+      </body>
+    </html>
+  )
 }
 `;
         
-        await fs.writeFile(path.join(appPath, 'page.tsx'), pageContent);
+        await fs.writeFile(path.join(appPath, 'layout.tsx'), layoutContent);
+        console.log(chalk.green('✅ Created app/layout.tsx with DashboardLayout\n'));
+        
+        // Create main page.tsx (Home)
+        const homePageContent = `import Home from '@/pages/Home'
+
+export default function Page() {
+  return <Home />
+}
+`;
+        
+        await fs.writeFile(path.join(appPath, 'page.tsx'), homePageContent);
         console.log(chalk.green('✅ Created app/page.tsx\n'));
+        
+        // Create route folders for all dashboard pages
+        const routes = [
+          { path: 'analytics', component: 'Analytics' },
+          { path: 'users', component: 'Users' },
+          { path: 'orders', component: 'Orders' },
+          { path: 'messages', component: 'Messages' },
+          { path: 'calendar', component: 'Calendar' },
+          { path: 'reports', component: 'Reports' },
+          { path: 'settings', component: 'Settings' },
+        ];
+        
+        // Create placeholder components for pages that don't exist
+        const placeholderComponents = {
+          Users: `export default function Users() {
+  return (
+    <div>
+      <h1 className="text-3xl font-bold mb-4">Users</h1>
+      <div className="bg-white p-6 rounded-lg shadow">
+        <p className="text-gray-600">Users management page coming soon...</p>
+      </div>
+    </div>
+  )
+}`,
+          Orders: `export default function Orders() {
+  return (
+    <div>
+      <h1 className="text-3xl font-bold mb-4">Orders</h1>
+      <div className="bg-white p-6 rounded-lg shadow">
+        <p className="text-gray-600">Orders management page coming soon...</p>
+      </div>
+    </div>
+  )
+}`,
+          Messages: `export default function Messages() {
+  return (
+    <div>
+      <h1 className="text-3xl font-bold mb-4">Messages</h1>
+      <div className="bg-white p-6 rounded-lg shadow">
+        <p className="text-gray-600">Messages page coming soon...</p>
+      </div>
+    </div>
+  )
+}`,
+          Calendar: `export default function Calendar() {
+  return (
+    <div>
+      <h1 className="text-3xl font-bold mb-4">Calendar</h1>
+      <div className="bg-white p-6 rounded-lg shadow">
+        <p className="text-gray-600">Calendar page coming soon...</p>
+      </div>
+    </div>
+  )
+}`,
+          Reports: `export default function Reports() {
+  return (
+    <div>
+      <h1 className="text-3xl font-bold mb-4">Reports</h1>
+      <div className="bg-white p-6 rounded-lg shadow">
+        <p className="text-gray-600">Reports page coming soon...</p>
+      </div>
+    </div>
+  )
+}`,
+        };
+        
+        for (const route of routes) {
+          const routePath = path.join(appPath, route.path);
+          await fs.ensureDir(routePath);
+          
+          let pageContent = '';
+          // Check if the page component exists in the pages directory
+          const pageComponentPath = path.join(pagesPath, `${route.component}.tsx`);
+          if (await fs.pathExists(pageComponentPath)) {
+            // Use existing component
+            pageContent = `import ${route.component} from '@/pages/${route.component}'
+
+export default function Page() {
+  return <${route.component} />
+}
+`;
+          } else if (placeholderComponents[route.component]) {
+            // Use placeholder
+            pageContent = placeholderComponents[route.component];
+          } else {
+            // Generic placeholder
+            pageContent = `export default function ${route.component}() {
+  return (
+    <div>
+      <h1 className="text-3xl font-bold mb-4">${route.component}</h1>
+      <div className="bg-white p-6 rounded-lg shadow">
+        <p className="text-gray-600">${route.component} page coming soon...</p>
+      </div>
+    </div>
+  )
+}`;
+          }
+          
+          await fs.writeFile(path.join(routePath, 'page.tsx'), pageContent);
+          console.log(chalk.green(`✅ Created app/${route.path}/page.tsx\n`));
+        }
       }
     } else {
+      // Empty template - create simple layout
+      const layoutContent = `import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: '${projectName}',
+  description: 'Generated with JGD FE CLI',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+`;
+      
+      await fs.writeFile(path.join(appPath, 'layout.tsx'), layoutContent);
+      console.log(chalk.green('✅ Created app/layout.tsx\n'));
+      
       // Empty template - simple page
       const pageContent = `export default function Home() {
   return (

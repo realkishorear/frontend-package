@@ -276,6 +276,11 @@ async function generateNextJSProject(targetPath, answers) {
       },
     };
     
+    // Add react-icons if dashboard template is selected
+    if (template === 'dashboard') {
+      packageJson.dependencies['react-icons'] = '^4.12.0';
+    }
+    
     await fs.writeJson(path.join(targetPath, 'package.json'), packageJson, { spaces: 2 });
     console.log(chalk.green('✅ Created package.json\n'));
     
@@ -453,10 +458,68 @@ export default function RootLayout({
         const componentsPath = path.join(srcPath, 'components');
         await fs.ensureDir(componentsPath);
         
-        // Copy dashboard components
+          // Copy dashboard components
         const dashboardComponentsPath = path.join(dashboardTemplatePath, 'components');
         if (await fs.pathExists(dashboardComponentsPath)) {
           await fs.copy(dashboardComponentsPath, componentsPath);
+          
+          // Update Sidebar.tsx to use Next.js Link instead of react-router-dom
+          const sidebarPath = path.join(componentsPath, 'Sidebar.tsx');
+          if (await fs.pathExists(sidebarPath)) {
+            let sidebarContent = await fs.readFile(sidebarPath, 'utf-8');
+            
+            // Add 'use client' directive if not present (needed for hooks in Next.js)
+            if (!sidebarContent.includes("'use client'")) {
+              sidebarContent = "'use client'\n\n" + sidebarContent;
+            }
+            
+            // Replace react-router-dom imports with Next.js
+            sidebarContent = sidebarContent.replace(
+              /import\s+\{\s*Link,\s*useLocation\s*\}\s+from\s+['"]react-router-dom['"]/g,
+              "import Link from 'next/link'\nimport { usePathname } from 'next/navigation'"
+            );
+            
+            // Replace useLocation() with usePathname()
+            sidebarContent = sidebarContent.replace(/const\s+location\s*=\s*useLocation\(\)/g, 'const pathname = usePathname()');
+            
+            // Replace location.pathname with pathname
+            sidebarContent = sidebarContent.replace(/location\.pathname/g, 'pathname');
+            
+            // Update Link component usage - Next.js Link needs href prop instead of to
+            sidebarContent = sidebarContent.replace(
+              /<Link\s+to="([^"]+)"([^>]*)>/g,
+              "<Link href=\"$1\"$2>"
+            );
+            
+            await fs.writeFile(sidebarPath, sidebarContent);
+            console.log(chalk.green('✅ Updated Sidebar component for Next.js\n'));
+          }
+          
+          // Add 'use client' directive to Header.tsx (uses hooks)
+          const headerPath = path.join(componentsPath, 'Header.tsx');
+          if (await fs.pathExists(headerPath)) {
+            let headerContent = await fs.readFile(headerPath, 'utf-8');
+            if (!headerContent.includes("'use client'")) {
+              headerContent = "'use client'\n\n" + headerContent;
+              await fs.writeFile(headerPath, headerContent);
+              console.log(chalk.green('✅ Updated Header component for Next.js\n'));
+            }
+          }
+          
+          // Add 'use client' directive to other components that use hooks
+          const componentFiles = ['Button.tsx', 'Card.tsx', 'Input.tsx', 'StatCard.tsx'];
+          for (const file of componentFiles) {
+            const filePath = path.join(componentsPath, file);
+            if (await fs.pathExists(filePath)) {
+              let fileContent = await fs.readFile(filePath, 'utf-8');
+              // Check if component uses hooks (useState, useEffect, etc.)
+              if ((fileContent.includes('useState') || fileContent.includes('useEffect') || fileContent.includes('useRef')) && !fileContent.includes("'use client'")) {
+                fileContent = "'use client'\n\n" + fileContent;
+                await fs.writeFile(filePath, fileContent);
+              }
+            }
+          }
+          
           console.log(chalk.green('✅ Copied dashboard components\n'));
         }
         

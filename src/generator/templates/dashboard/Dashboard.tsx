@@ -5,6 +5,7 @@ import Header from './components/Header'
 import Home from './pages/Home'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
+import ProtectedRoute from './components/ProtectedRoute'
 
 // Placeholder pages for other routes
 function Users() {
@@ -105,14 +106,71 @@ function Dashboard() {
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 sm:p-6 lg:p-8">
             <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/users" element={<Users />} />
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/messages" element={<Messages />} />
-              <Route path="/calendar" element={<Calendar />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/settings" element={<Settings />} />
+              {/* Protected Routes */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <Home />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/analytics"
+                element={
+                  <ProtectedRoute>
+                    <Analytics />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/users"
+                element={
+                  <ProtectedRoute>
+                    <Users />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/orders"
+                element={
+                  <ProtectedRoute>
+                    <Orders />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/messages"
+                element={
+                  <ProtectedRoute>
+                    <Messages />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/calendar"
+                element={
+                  <ProtectedRoute>
+                    <Calendar />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/reports"
+                element={
+                  <ProtectedRoute>
+                    <Reports />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                }
+              />
             </Routes>
           </div>
         </main>

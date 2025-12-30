@@ -236,6 +236,351 @@ async function configureBundler(targetPath, bundler, cssFramework, routingType) 
 }
 
 /**
+ * Generate Next.js project
+ */
+async function generateNextJSProject(targetPath, answers) {
+  const { template } = answers;
+  const projectName = path.basename(targetPath);
+  
+  console.log(chalk.blue('▲ Generating Next.js project...\n'));
+  
+  try {
+    await fs.ensureDir(targetPath);
+    
+    // Create package.json
+    const packageJson = {
+      name: projectName,
+      version: '0.1.0',
+      private: true,
+      scripts: {
+        dev: 'next dev',
+        build: 'next build',
+        start: 'next start',
+        lint: 'next lint',
+      },
+      dependencies: {
+        react: '^18.2.0',
+        'react-dom': '^18.2.0',
+        next: '^14.0.0',
+      },
+      devDependencies: {
+        '@types/node': '^20.10.0',
+        '@types/react': '^18.2.0',
+        '@types/react-dom': '^18.2.0',
+        typescript: '^5.3.3',
+        'eslint': '^8.55.0',
+        'eslint-config-next': '^14.0.0',
+        'tailwindcss': '^3.3.6',
+        'postcss': '^8.4.32',
+        'autoprefixer': '^10.4.16',
+      },
+    };
+    
+    await fs.writeJson(path.join(targetPath, 'package.json'), packageJson, { spaces: 2 });
+    console.log(chalk.green('✅ Created package.json\n'));
+    
+    // Create tsconfig.json
+    const tsconfig = {
+      compilerOptions: {
+        target: 'ES2017',
+        lib: ['dom', 'dom.iterable', 'esnext'],
+        allowJs: true,
+        skipLibCheck: true,
+        strict: true,
+        noEmit: true,
+        esModuleInterop: true,
+        module: 'esnext',
+        moduleResolution: 'bundler',
+        resolveJsonModule: true,
+        isolatedModules: true,
+        jsx: 'preserve',
+        incremental: true,
+        plugins: [
+          {
+            name: 'next',
+          },
+        ],
+        paths: {
+          '@/*': ['./src/*'],
+        },
+      },
+      include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
+      exclude: ['node_modules'],
+    };
+    
+    await fs.writeJson(path.join(targetPath, 'tsconfig.json'), tsconfig, { spaces: 2 });
+    console.log(chalk.green('✅ Created tsconfig.json\n'));
+    
+    // Create next.config.js
+    const nextConfig = `/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+}
+
+module.exports = nextConfig
+`;
+    
+    await fs.writeFile(path.join(targetPath, 'next.config.js'), nextConfig);
+    console.log(chalk.green('✅ Created next.config.js\n'));
+    
+    // Create tailwind.config.js
+    const tailwindConfig = `/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+`;
+    
+    await fs.writeFile(path.join(targetPath, 'tailwind.config.js'), tailwindConfig);
+    console.log(chalk.green('✅ Created tailwind.config.js\n'));
+    
+    // Create postcss.config.js
+    const postcssConfig = `module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+`;
+    
+    await fs.writeFile(path.join(targetPath, 'postcss.config.js'), postcssConfig);
+    console.log(chalk.green('✅ Created postcss.config.js\n'));
+    
+    // Create .eslintrc.json
+    const eslintConfig = {
+      extends: 'next/core-web-vitals',
+    };
+    
+    await fs.writeJson(path.join(targetPath, '.eslintrc.json'), eslintConfig, { spaces: 2 });
+    console.log(chalk.green('✅ Created .eslintrc.json\n'));
+    
+    // Create .gitignore
+    const gitignore = `# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+`;
+    
+    await fs.writeFile(path.join(targetPath, '.gitignore'), gitignore);
+    console.log(chalk.green('✅ Created .gitignore\n'));
+    
+    // Create src directory structure
+    const srcPath = path.join(targetPath, 'src');
+    await fs.ensureDir(srcPath);
+    
+    // Create app directory (App Router)
+    const appPath = path.join(srcPath, 'app');
+    await fs.ensureDir(appPath);
+    
+    // Create global styles
+    const globalCss = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+`;
+    
+    await fs.writeFile(path.join(appPath, 'globals.css'), globalCss);
+    console.log(chalk.green('✅ Created app/globals.css\n'));
+    
+    // Create layout.tsx
+    const layoutContent = `import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: '${projectName}',
+  description: 'Generated with JGD FE CLI',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+`;
+    
+    await fs.writeFile(path.join(appPath, 'layout.tsx'), layoutContent);
+    console.log(chalk.green('✅ Created app/layout.tsx\n'));
+    
+    // Create page.tsx based on template
+    if (template === 'dashboard') {
+      // Copy dashboard template
+      const dashboardTemplatePath = path.join(__dirname, 'templates', 'dashboard');
+      if (await fs.pathExists(dashboardTemplatePath)) {
+        // Create components directory
+        const componentsPath = path.join(srcPath, 'components');
+        await fs.ensureDir(componentsPath);
+        
+        // Copy dashboard components
+        const dashboardComponentsPath = path.join(dashboardTemplatePath, 'components');
+        if (await fs.pathExists(dashboardComponentsPath)) {
+          await fs.copy(dashboardComponentsPath, componentsPath);
+          console.log(chalk.green('✅ Copied dashboard components\n'));
+        }
+        
+        // Create pages directory for dashboard pages
+        const pagesPath = path.join(srcPath, 'pages');
+        await fs.ensureDir(pagesPath);
+        
+        const dashboardPagesPath = path.join(dashboardTemplatePath, 'pages');
+        if (await fs.pathExists(dashboardPagesPath)) {
+          await fs.copy(dashboardPagesPath, pagesPath);
+          console.log(chalk.green('✅ Copied dashboard pages\n'));
+        }
+        
+        // Create a Next.js-compatible Dashboard component (without React Router)
+        const dashboardContent = `'use client'
+
+import { useState, useEffect } from 'react'
+import Sidebar from '@/components/Sidebar'
+import Header from '@/components/Header'
+import Home from '@/pages/Home'
+
+export default function Dashboard() {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024)
+      if (window.innerWidth >= 1024) {
+        setSidebarOpen(true)
+      } else {
+        setSidebarOpen(false)
+      }
+    }
+
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen)
+  }
+
+  const closeSidebar = () => {
+    if (isMobile) {
+      setSidebarOpen(false)
+    }
+  }
+
+  return (
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Sidebar */}
+      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} isMobile={isMobile} />
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
+        {/* Header */}
+        <Header onMenuClick={toggleSidebar} />
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-4 sm:p-6 lg:p-8">
+            <Home />
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+`;
+        
+        await fs.writeFile(path.join(componentsPath, 'Dashboard.tsx'), dashboardContent);
+        console.log(chalk.green('✅ Created Dashboard component\n'));
+        
+        // Create main page.tsx that uses Dashboard
+        const pageContent = `import Dashboard from '@/components/Dashboard'
+
+export default function Home() {
+  return <Dashboard />
+}
+`;
+        
+        await fs.writeFile(path.join(appPath, 'page.tsx'), pageContent);
+        console.log(chalk.green('✅ Created app/page.tsx\n'));
+      }
+    } else {
+      // Empty template - simple page
+      const pageContent = `export default function Home() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold mb-4">Welcome to ${projectName}</h1>
+        <p className="text-gray-600">Start building something amazing!</p>
+      </div>
+    </div>
+  )
+}
+`;
+      
+      await fs.writeFile(path.join(appPath, 'page.tsx'), pageContent);
+      console.log(chalk.green('✅ Created app/page.tsx\n'));
+    }
+    
+    // Install dependencies
+    console.log(chalk.blue('📦 Installing dependencies...\n'));
+    await installDependencies(targetPath);
+    console.log(chalk.green('✅ Dependencies installed!\n'));
+    
+    console.log(chalk.green('✅ Next.js project generated successfully!\n'));
+    console.log(chalk.cyan('📝 Next steps:'));
+    if (targetPath !== process.cwd()) {
+      console.log(chalk.white(`   cd ${path.basename(targetPath)}`));
+    }
+    console.log(chalk.white('   npm run dev'));
+    console.log(chalk.white('\n🎉 Happy coding!\n'));
+    
+  } catch (error) {
+    console.error(chalk.red(`❌ Error generating Next.js project: ${error.message}`));
+    throw error;
+  }
+}
+
+/**
  * Generate Angular project
  */
 async function generateAngularProject(targetPath, answers) {
@@ -551,6 +896,10 @@ export async function generateProject(targetPath, answers) {
   const { framework, cssFramework: cssFrameworkRaw, componentLibrary: componentLibraryRaw, bundler, stateManagement, template: templateRaw } = answers;
   
   // Route to appropriate generator based on framework
+  if (framework === 'nextjs') {
+    return await generateNextJSProject(targetPath, answers);
+  }
+  
   if (framework === 'angular') {
     return await generateAngularProject(targetPath, answers);
   }

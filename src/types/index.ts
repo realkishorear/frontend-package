@@ -3,7 +3,7 @@
  */
 
 export interface ProjectAnswers {
-  framework: 'react' | 'angular';
+  framework: 'react' | 'angular' | 'nextjs';
   cssFramework: 'tailwind' | 'scss' | 'css';
   componentLibrary: 'mui' | 'shadcn' | 'plain';
   bundler?: 'vite' | 'webpack'; // Only for React

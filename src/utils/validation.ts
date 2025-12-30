@@ -7,6 +7,21 @@ import type { ProjectAnswers } from '../types/index.js';
  * Validates project answers
  */
 export function validateAnswers(answers: Partial<ProjectAnswers>): asserts answers is ProjectAnswers {
+  // For Next.js, only framework and template are required
+  if (answers.framework === 'nextjs') {
+    if (!answers.framework || !answers.template) {
+      throw new ValidationError(
+        'Missing required fields: framework, template',
+        'framework'
+      );
+    }
+    // Set defaults for Next.js
+    if (!answers.cssFramework) answers.cssFramework = 'tailwind';
+    if (!answers.componentLibrary) answers.componentLibrary = 'plain';
+    if (!answers.stateManagement) answers.stateManagement = 'plain';
+    return;
+  }
+
   const required = ['framework', 'cssFramework', 'componentLibrary', 'stateManagement', 'template'];
   const missing = required.filter((field) => !answers[field as keyof ProjectAnswers]);
 
@@ -18,7 +33,7 @@ export function validateAnswers(answers: Partial<ProjectAnswers>): asserts answe
   }
 
   // Validate framework
-  const validFrameworks = ['react', 'angular'];
+  const validFrameworks = ['react', 'angular', 'nextjs'];
   if (!validFrameworks.includes(answers.framework!)) {
     throw new ValidationError(
       `Invalid framework: ${answers.framework}. Must be one of: ${validFrameworks.join(', ')}`,

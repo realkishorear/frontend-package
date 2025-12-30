@@ -17,9 +17,34 @@ export async function askQuestions(): Promise<ProjectAnswers> {
         choices: [
           { name: '⚛️  React', value: 'react' },
           { name: '🅰️  Angular', value: 'angular' },
+          { name: '▲ Next.js', value: 'nextjs' },
         ],
       },
     ]);
+
+    // If Next.js is selected, only ask about template
+    if (frameworkAnswer.framework === 'nextjs') {
+      const templateAnswer = await inquirer.prompt<{ template: ProjectAnswers['template'] }>([
+        {
+          type: 'list',
+          name: 'template',
+          message: chalk.cyan.bold('\nDo you want any Template:'),
+          choices: [
+            { name: '📊 Dashboard', value: 'dashboard' },
+            { name: '❌ No Templates', value: 'none' },
+          ],
+        },
+      ]);
+
+      // Return minimal answers for Next.js
+      return {
+        ...frameworkAnswer,
+        cssFramework: 'tailwind', // Default for Next.js
+        componentLibrary: 'plain', // Default for Next.js
+        stateManagement: 'plain', // Default for Next.js
+        ...templateAnswer,
+      };
+    }
 
     // Question 2: CSS Library
     const cssChoices: Array<{ name: string; value: ProjectAnswers['cssFramework']; short: string }> = [

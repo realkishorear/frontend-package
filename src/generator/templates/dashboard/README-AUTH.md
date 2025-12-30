@@ -1,121 +1,176 @@
-# React Dashboard Auth Template
+# React Dashboard Auth Template with OIDC
 
-This template provides a complete authentication system for React Dashboard applications with OpenID/OAuth-style UI.
+This template provides a complete OIDC (OpenID Connect) authentication system for React Dashboard applications.
 
 ## Components
 
-- **Login** (`pages/Login.tsx`) - Login page with email/password and OAuth options
-- **Register** (`pages/Register.tsx`) - Registration page with validation
-- **AuthService** (`services/authService.tsx`) - Authentication service with backend integration placeholders
+- **Login** (`pages/Login.tsx`) - OIDC login page
+- **Register** (`pages/Register.tsx`) - OIDC registration page
+- **AuthService** (`services/authService.tsx`) - OIDC authentication hook wrapper
+- **OIDC Config** (`config/oidc.config.ts`) - OIDC provider configuration
 - **ProtectedRoute** (`components/ProtectedRoute.tsx`) - Route wrapper for protecting authenticated routes
-- **App** (`App.tsx`) - Main app component with AuthProvider and routing
+- **App** (`App.tsx`) - Main app component with OIDC AuthProvider
 
 ## Features
 
-- Email/password authentication
-- OAuth provider buttons (Google, GitHub, Twitter) - UI ready, backend integration needed
-- Form validation
-- Token management placeholders
-- Protected routes
-- Session management
-- Beautiful, modern UI with Tailwind CSS
+- ✅ OIDC (OpenID Connect) authentication
+- ✅ Automatic token renewal
+- ✅ User profile management
+- ✅ Protected routes
+- ✅ Session management
+- ✅ Beautiful, modern UI with Tailwind CSS
 
-## Backend Integration
+## Setup
 
-All backend integration points are marked with `TODO` comments. You need to:
+### 1. Install Dependencies
 
-1. **Update API URLs** in `services/authService.tsx`:
-   - Replace placeholder fetch calls with your actual backend endpoints
-   - Expected response format: `{ user: User, token: string, refreshToken?: string }`
+The template includes `oidc-react` in the base package.json. Make sure to install it:
 
-2. **Implement login endpoint**:
-   - Replace the placeholder in `login()` method
-   - POST to `/api/auth/login` with `{ email, password }`
+```bash
+npm install oidc-react
+```
 
-3. **Implement register endpoint**:
-   - Replace the placeholder in `register()` method
-   - POST to `/api/auth/register` with `{ name, email, password }`
+### 2. Configure OIDC Provider
 
-4. **Implement logout endpoint**:
-   - Replace the placeholder in `logout()` method
-   - POST to `/api/auth/logout`
+Edit `config/oidc.config.ts` with your OIDC provider settings:
 
-5. **Implement token validation**:
-   - Replace the placeholder in `initializeAuth()` method
-   - Validate stored tokens on app initialization
+```typescript
+export const oidcConfig: AuthProviderProps = {
+  authority: 'https://your-oidc-provider.com',
+  clientId: 'your-client-id',
+  redirectUri: 'http://localhost:5173',
+  // ... other settings
+}
+```
 
-6. **Implement token refresh**:
-   - Replace the placeholder in `refreshToken()` method
-   - POST to `/api/auth/refresh` with `{ refreshToken }`
+### 3. Environment Variables
 
-7. **Implement OAuth redirects**:
-   - Update `handleOAuthLogin()` and `handleOAuthRegister()` methods in Login/Register components
-   - Redirect to your OAuth backend endpoints (e.g., `/api/auth/google`, `/api/auth/github`)
+Create a `.env` file in your project root:
+
+```env
+REACT_APP_OIDC_AUTHORITY=https://your-oidC-provider.com
+REACT_APP_OIDC_CLIENT_ID=your-client-id
+REACT_APP_OIDC_REDIRECT_URI=http://localhost:5173
+REACT_APP_OIDC_POST_LOGOUT_REDIRECT_URI=http://localhost:5173
+REACT_APP_OIDC_SILENT_REDIRECT_URI=http://localhost:5173/silent-renew.html
+```
+
+### 4. Silent Renew Page
+
+The `silent-renew.html` file is already included in `public/silent-renew.html`. This is used for automatic token renewal.
 
 ## Usage
 
-1. **Update main.tsx** to use the App component:
-   ```tsx
-   import App from './App'
-   
-   ReactDOM.createRoot(document.getElementById('root')!).render(
-     <React.StrictMode>
-       <ConfigProvider>
-         <BrowserRouter>
-           <App />
-         </BrowserRouter>
-       </ConfigProvider>
-     </React.StrictMode>,
-   )
-   ```
+### 1. App Component
 
-2. **Use AuthService in components**:
-   ```tsx
-   import { useAuth } from './services/authService'
-   
-   function MyComponent() {
-     const { user, isAuthenticated, logout } = useAuth()
-     
-     return (
-       <div>
-         {isAuthenticated && <p>Welcome, {user?.name}</p>}
-         <button onClick={logout}>Logout</button>
-       </div>
-     )
-   }
-   ```
+The `App.tsx` is already configured with OIDC AuthProvider:
 
-3. **Protect routes**:
-   ```tsx
-   import ProtectedRoute from './components/ProtectedRoute'
-   
-   <Route
-     path="/dashboard"
-     element={
-       <ProtectedRoute>
-         <Dashboard />
-       </ProtectedRoute>
-     }
-   />
-   ```
+```tsx
+import { AuthProvider } from 'oidc-react'
+import { oidcConfig } from './config/oidc.config'
+
+function App() {
+  return (
+    <AuthProvider {...oidcConfig}>
+      {/* Your routes */}
+    </AuthProvider>
+  )
+}
+```
+
+### 2. Use Auth in Components
+
+```tsx
+import { useAuth } from './services/authService'
+
+function MyComponent() {
+  const { user, isAuthenticated, signOut } = useAuth()
+  
+  return (
+    <div>
+      {isAuthenticated && <p>Welcome, {user?.name}</p>}
+      <button onClick={signOut}>Logout</button>
+    </div>
+  )
+}
+```
+
+### 3. Protect Routes
+
+```tsx
+import ProtectedRoute from './components/ProtectedRoute'
+
+<Route
+  path="/dashboard"
+  element={
+    <ProtectedRoute>
+      <Dashboard />
+    </ProtectedRoute>
+  }
+/>
+```
+
+## OIDC Provider Setup
+
+### Common OIDC Providers
+
+1. **Auth0**
+   - Authority: `https://YOUR_DOMAIN.auth0.com`
+   - [Auth0 React Quickstart](https://auth0.com/docs/quickstart/spa/react)
+
+2. **Keycloak**
+   - Authority: `https://your-keycloak-server.com/realms/your-realm`
+   - [Keycloak Documentation](https://www.keycloak.org/docs/latest/securing_apps/)
+
+3. **Okta**
+   - Authority: `https://YOUR_DOMAIN.okta.com/oauth2/default`
+   - [Okta React Guide](https://developer.okta.com/docs/guides/sign-into-spa/react/before-you-begin/)
+
+4. **Azure AD**
+   - Authority: `https://login.microsoftonline.com/YOUR_TENANT_ID`
+   - [Azure AD Guide](https://learn.microsoft.com/en-us/azure/active-directory/develop/tutorial-v2-react)
 
 ## Routes
 
-- `/login` - Login page (public)
-- `/register` - Registration page (public)
+- `/login` - OIDC login page (public)
+- `/register` - OIDC registration page (public)
 - `/` - Dashboard home (protected)
 - `/analytics` - Analytics page (protected)
 - `/settings` - Settings page (protected)
 - All other dashboard routes are protected
 
-## Styling
+## User Information
 
-This template uses Tailwind CSS. Make sure Tailwind is configured in your project.
+The OIDC user data is automatically mapped to our User type:
 
-## Token Storage
+```typescript
+interface User {
+  id: string        // from userData.sub
+  name: string      // from userData.name or preferred_username
+  email: string     // from userData.email
+  avatar?: string   // from userData.picture or avatar_url
+}
+```
 
-Tokens are stored in `localStorage` by default. You can modify this in `authService.tsx` to use:
-- `sessionStorage` for session-based tokens
-- Cookies for server-side rendering compatibility
-- Secure HTTP-only cookies (requires backend support)
+## Troubleshooting
 
+### Token Renewal Issues
+
+If silent token renewal fails:
+1. Ensure `public/silent-renew.html` exists
+2. Check the silent redirect URI is correctly configured
+3. Verify CORS settings in your OIDC provider
+
+### Redirect Issues
+
+Make sure all redirect URIs:
+1. Are configured in your OIDC provider
+2. Match exactly (including protocol, domain, and path)
+3. Are added to allowed redirect URIs
+
+### Build Issues
+
+If you get import errors:
+1. Make sure `oidc-react` is installed: `npm install oidc-react`
+2. Check that TypeScript can resolve the module
+3. Verify the package is in your `package.json` dependencies

@@ -2,23 +2,23 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from 'oidc-react'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, loading } = useAuth()
+  const auth = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
+    if (!auth.isLoading && !auth.isAuthenticated) {
       router.push('/login')
     }
-  }, [isAuthenticated, loading, router])
+  }, [auth.isAuthenticated, auth.isLoading, router])
 
-  if (loading) {
+  if (auth.isLoading) {
     // Show loading spinner while checking auth
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -27,7 +27,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     )
   }
 
-  if (!isAuthenticated) {
+  if (!auth.isAuthenticated) {
     return null
   }
 

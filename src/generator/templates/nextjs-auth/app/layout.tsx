@@ -1,10 +1,8 @@
-import { AuthProvider } from '../contexts/AuthContext'
-import './globals.css'
+'use client'
 
-export const metadata = {
-  title: 'Next.js App with Auth',
-  description: 'Next.js application with authentication',
-}
+import { AuthProvider } from 'oidc-react'
+import { oidcConfig } from '../config/oidc.config'
+import './globals.css'
 
 export default function RootLayout({
   children,
@@ -14,7 +12,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
+        <AuthProvider {...oidcConfig}>
           {children}
         </AuthProvider>
       </body>

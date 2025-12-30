@@ -1,15 +1,15 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../services/authService'
+import { useAuth } from 'oidc-react'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
 }
 
 function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, loading } = useAuth()
+  const auth = useAuth()
   const location = useLocation()
 
-  if (loading) {
+  if (auth.isLoading) {
     // Show loading spinner while checking auth
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -18,8 +18,9 @@ function ProtectedRoute({ children }: ProtectedRouteProps) {
     )
   }
 
-  if (!isAuthenticated) {
+  if (!auth.isAuthenticated) {
     // Redirect to login page with return url
+    // OIDC will handle the redirect to the identity provider
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 

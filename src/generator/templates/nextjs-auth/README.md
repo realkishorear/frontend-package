@@ -1,126 +1,171 @@
-# Next.js Auth Template
+# Next.js Auth Template with OIDC
 
-This template provides a complete authentication system for Next.js 13+ applications (App Router) with OpenID/OAuth-style UI.
+This template provides a complete OIDC (OpenID Connect) authentication system for Next.js 13+ applications (App Router).
 
 ## Structure
 
-- **Pages** (`app/login/`, `app/register/`) - Authentication pages
-- **AuthContext** (`contexts/AuthContext.tsx`) - Authentication context with backend integration placeholders
+- **Pages** (`app/login/`, `app/register/`) - OIDC authentication pages
+- **AuthContext** (`contexts/AuthContext.tsx`) - OIDC authentication hook wrapper
+- **OIDC Config** (`config/oidc.config.ts`) - OIDC provider configuration
 - **Middleware** (`middleware.ts`) - Route protection middleware
 - **ProtectedRoute** (`components/ProtectedRoute.tsx`) - Client-side route protection component
 
 ## Features
 
-- Email/password authentication
-- OAuth provider buttons (Google, GitHub, Twitter) - UI ready, backend integration needed
-- Form validation
-- Token management placeholders
-- Protected routes (both middleware and client-side)
-- Session management
-- Next.js 13+ App Router compatible
+- ✅ OIDC (OpenID Connect) authentication
+- ✅ Automatic token renewal
+- ✅ User profile management
+- ✅ Protected routes (both middleware and client-side)
+- ✅ Session management
+- ✅ Next.js 13+ App Router compatible
+- ✅ TypeScript support
 
-## Backend Integration
+## Setup
 
-All backend integration points are marked with `TODO` comments. You need to:
+### 1. Install Dependencies
 
-1. **Update API URLs** in `AuthContext.tsx`:
-   - Replace placeholder fetch calls with your actual backend endpoints
-   - Expected response format: `{ user: User, token: string, refreshToken?: string }`
+The template includes `oidc-react` in the base package.json. Make sure to install it:
 
-2. **Implement login endpoint**:
-   - Replace the placeholder in `login()` method
-   - POST to `/api/auth/login` with `{ email, password }`
+```bash
+npm install oidc-react
+```
 
-3. **Implement register endpoint**:
-   - Replace the placeholder in `register()` method
-   - POST to `/api/auth/register` with `{ name, email, password }`
+### 2. Configure OIDC Provider
 
-4. **Implement logout endpoint**:
-   - Replace the placeholder in `logout()` method
-   - POST to `/api/auth/logout`
+Edit `config/oidc.config.ts` with your OIDC provider settings:
 
-5. **Implement token validation**:
-   - Replace the placeholder in `initializeAuth()` method
-   - Validate stored tokens on app initialization
+```typescript
+export const oidcConfig: AuthProviderProps = {
+  authority: 'https://your-oidc-provider.com',
+  clientId: 'your-client-id',
+  redirectUri: 'http://localhost:3000',
+  // ... other settings
+}
+```
 
-6. **Implement token refresh**:
-   - Replace the placeholder in `refreshToken()` method
-   - POST to `/api/auth/refresh` with `{ refreshToken }`
+### 3. Environment Variables
 
-7. **Update middleware** (`middleware.ts`):
-   - Replace token check logic with your actual authentication verification
-   - Adjust cookie/header names based on your token storage strategy
+Create a `.env.local` file:
 
-8. **Implement OAuth redirects**:
-   - Update `handleOAuthLogin()` and `handleOAuthRegister()` methods
-   - Redirect to your OAuth backend endpoints
+```env
+NEXT_PUBLIC_OIDC_AUTHORITY=https://your-oidc-provider.com
+NEXT_PUBLIC_OIDC_CLIENT_ID=your-client-id
+NEXT_PUBLIC_OIDC_REDIRECT_URI=http://localhost:3000
+NEXT_PUBLIC_OIDC_POST_LOGOUT_REDIRECT_URI=http://localhost:3000
+NEXT_PUBLIC_OIDC_SILENT_REDIRECT_URI=http://localhost:3000/silent-renew.html
+```
+
+### 4. Create Silent Renew Page
+
+Create `public/silent-renew.html`:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Silent Renew</title>
+</head>
+<body>
+  <script>
+    // This page is used for silent token renewal in OIDC
+  </script>
+</body>
+</html>
+```
 
 ## Usage
 
-1. **Wrap your app with AuthProvider** in `app/layout.tsx`:
-   ```tsx
-   import { AuthProvider } from '../contexts/AuthContext'
-   
-   export default function RootLayout({ children }) {
-     return (
-       <html>
-         <body>
-           <AuthProvider>
-             {children}
-           </AuthProvider>
-         </body>
-       </html>
-     )
-   }
-   ```
+### 1. App Layout
 
-2. **Protect routes with middleware**:
-   - The `middleware.ts` file automatically protects routes
-   - Adjust the `matcher` config to include/exclude specific routes
+The `app/layout.tsx` is already configured with OIDC AuthProvider:
 
-3. **Use ProtectedRoute component** for client-side protection:
-   ```tsx
-   import ProtectedRoute from '../components/ProtectedRoute'
-   
-   export default function DashboardPage() {
-     return (
-       <ProtectedRoute>
-         <div>Protected content</div>
-       </ProtectedRoute>
-     )
-   }
-   ```
+```tsx
+import { AuthProvider } from 'oidc-react'
+import { oidcConfig } from '../config/oidc.config'
 
-4. **Use AuthContext in components**:
-   ```tsx
-   'use client'
-   import { useAuth } from '../contexts/AuthContext'
-   
-   export default function MyComponent() {
-     const { user, isAuthenticated, logout } = useAuth()
-     
-     return (
-       <div>
-         {isAuthenticated && <p>Welcome, {user?.name}</p>}
-         <button onClick={logout}>Logout</button>
-       </div>
-     )
-   }
-   ```
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <AuthProvider {...oidcConfig}>
+          {children}
+        </AuthProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+### 2. Use Auth in Components
+
+```tsx
+'use client'
+import { useAuth } from '../contexts/AuthContext'
+
+export default function MyComponent() {
+  const { user, isAuthenticated, signOut } = useAuth()
+  
+  return (
+    <div>
+      {isAuthenticated && <p>Welcome, {user?.name}</p>}
+      <button onClick={signOut}>Logout</button>
+    </div>
+  )
+}
+```
+
+### 3. Protect Routes
+
+Use the `ProtectedRoute` component:
+
+```tsx
+import ProtectedRoute from '../components/ProtectedRoute'
+
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <div>Protected content</div>
+    </ProtectedRoute>
+  )
+}
+```
+
+## OIDC Provider Setup
+
+### Common OIDC Providers
+
+1. **Auth0**
+   - Authority: `https://YOUR_DOMAIN.auth0.com`
+   - [Auth0 React Quickstart](https://auth0.com/docs/quickstart/spa/react)
+
+2. **Keycloak**
+   - Authority: `https://your-keycloak-server.com/realms/your-realm`
+   - [Keycloak Documentation](https://www.keycloak.org/docs/latest/securing_apps/)
+
+3. **Okta**
+   - Authority: `https://YOUR_DOMAIN.okta.com/oauth2/default`
+   - [Okta React Guide](https://developer.okta.com/docs/guides/sign-into-spa/react/before-you-begin/)
+
+4. **Azure AD**
+   - Authority: `https://login.microsoftonline.com/YOUR_TENANT_ID`
+   - [Azure AD Guide](https://learn.microsoft.com/en-us/azure/active-directory/develop/tutorial-v2-react)
 
 ## Styling
 
 This template uses Tailwind CSS. Make sure Tailwind is configured in your Next.js project.
 
-## Environment Variables
+## Troubleshooting
 
-Create a `.env.local` file for your API URLs:
-```
-NEXT_PUBLIC_API_URL=http://localhost:3000/api
-```
+### Token Renewal Issues
 
-Then use it in your AuthContext:
-```tsx
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api'
-```
+If silent token renewal fails, check:
+1. `silent-renew.html` exists in the `public` folder
+2. The silent redirect URI is correctly configured in your OIDC provider
+3. CORS settings allow the redirect
 
+### Redirect Issues
+
+Make sure all redirect URIs are:
+1. Configured in your OIDC provider
+2. Match exactly (including protocol, domain, and path)
+3. Added to allowed redirect URIs in provider settings

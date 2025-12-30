@@ -276,9 +276,10 @@ async function generateNextJSProject(targetPath, answers) {
       },
     };
     
-    // Add react-icons if dashboard template is selected
+    // Add react-icons and oidc-react if dashboard template is selected
     if (template === 'dashboard') {
       packageJson.dependencies['react-icons'] = '^4.12.0';
+      packageJson.dependencies['oidc-react'] = '^1.3.0';
     }
     
     await fs.writeJson(path.join(targetPath, 'package.json'), packageJson, { spaces: 2 });

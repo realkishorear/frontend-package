@@ -8,12 +8,14 @@ import {
   FiLogOut,
   FiSettings
 } from 'react-icons/fi'
+import { useAuth } from '../services/authService'
 
 interface HeaderProps {
   onMenuClick: () => void
 }
 
 function Header({ onMenuClick }: HeaderProps) {
+  const { user, signOut } = useAuth()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
@@ -107,15 +109,31 @@ function Header({ onMenuClick }: HeaderProps) {
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100"
               >
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
-                  <span className="text-sm font-semibold text-white">JD</span>
-                </div>
-                <span className="hidden sm:block text-sm font-medium text-gray-700">John Doe</span>
+                {user?.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
+                    className="w-8 h-8 rounded-full"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
+                    <span className="text-sm font-semibold text-white">
+                      {user?.name?.charAt(0).toUpperCase() || 'U'}
+                    </span>
+                  </div>
+                )}
+                <span className="hidden sm:block text-sm font-medium text-gray-700">
+                  {user?.name || 'User'}
+                </span>
                 <FiChevronDown className="hidden sm:block w-4 h-4 text-gray-500" />
               </button>
 
               {showUserMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                  <div className="px-4 py-2 border-b border-gray-200">
+                    <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
+                    <p className="text-xs text-gray-500">{user?.email}</p>
+                  </div>
                   <a
                     href="#"
                     className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -131,13 +149,16 @@ function Header({ onMenuClick }: HeaderProps) {
                     Settings
                   </a>
                   <div className="border-t border-gray-200 my-1"></div>
-                  <a
-                    href="#"
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
+                  <button
+                    onClick={async () => {
+                      await signOut()
+                      setShowUserMenu(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
                   >
                     <FiLogOut className="w-4 h-4" />
                     Logout
-                  </a>
+                  </button>
                 </div>
               )}
             </div>

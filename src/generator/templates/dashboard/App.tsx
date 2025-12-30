@@ -1,12 +1,13 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './services/authService'
+import { AuthProvider } from 'oidc-react'
+import { oidcConfig } from './config/oidc.config'
 import Dashboard from './Dashboard'
 import Login from './pages/Login'
 import Register from './pages/Register'
 
 function App() {
   return (
-    <AuthProvider>
+    <AuthProvider {...oidcConfig}>
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />

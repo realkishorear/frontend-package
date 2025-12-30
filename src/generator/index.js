@@ -503,7 +503,23 @@ next-env.d.ts
         const dashboardPagesPath = path.join(dashboardTemplatePath, 'pages');
         if (await fs.pathExists(dashboardPagesPath)) {
           await fs.copy(dashboardPagesPath, pagesPath);
-          console.log(chalk.green('✅ Copied dashboard pages\n'));
+          
+          // Add 'use client' directive to all page components that use hooks
+          const pageFiles = await fs.readdir(pagesPath);
+          for (const file of pageFiles) {
+            if (file.endsWith('.tsx')) {
+              const filePath = path.join(pagesPath, file);
+              let fileContent = await fs.readFile(filePath, 'utf-8');
+              
+              // Check if component uses hooks
+              if ((fileContent.includes('useState') || fileContent.includes('useEffect') || fileContent.includes('useRef') || fileContent.includes('useCallback') || fileContent.includes('useMemo')) && !fileContent.includes("'use client'")) {
+                fileContent = "'use client'\n\n" + fileContent;
+                await fs.writeFile(filePath, fileContent);
+              }
+            }
+          }
+          
+          console.log(chalk.green('✅ Copied dashboard pages and added client directives\n'));
         }
         
         // Create Dashboard Layout component (used by all routes)
@@ -598,12 +614,47 @@ export default function RootLayout({
         console.log(chalk.green('✅ Created app/layout.tsx with DashboardLayout\n'));
         
         // Create main page.tsx (Home)
-        const homePageContent = `import Home from '@/pages/Home'
+        // Check if Home component uses hooks
+        const homeComponentPath = path.join(pagesPath, 'Home.tsx');
+        let homePageContent = '';
+        if (await fs.pathExists(homeComponentPath)) {
+          const homeContent = await fs.readFile(homeComponentPath, 'utf-8');
+          const needsClient = homeContent.includes('useState') || 
+                             homeContent.includes('useEffect') || 
+                             homeContent.includes('useRef') ||
+                             homeContent.includes('useCallback') ||
+                             homeContent.includes('useMemo') ||
+                             homeContent.includes("'use client'");
+          
+          if (needsClient) {
+            homePageContent = `'use client'
+
+import Home from '@/pages/Home'
 
 export default function Page() {
   return <Home />
 }
 `;
+          } else {
+            homePageContent = `import Home from '@/pages/Home'
+
+export default function Page() {
+  return <Home />
+}
+`;
+          }
+        } else {
+          homePageContent = `export default function Page() {
+  return (
+    <div>
+      <h1 className="text-3xl font-bold mb-4">Home</h1>
+      <div className="bg-white p-6 rounded-lg shadow">
+        <p className="text-gray-600">Home page</p>
+      </div>
+    </div>
+  )
+}`;
+        }
         
         await fs.writeFile(path.join(appPath, 'page.tsx'), homePageContent);
         console.log(chalk.green('✅ Created app/page.tsx\n'));
@@ -681,13 +732,33 @@ export default function Page() {
           // Check if the page component exists in the pages directory
           const pageComponentPath = path.join(pagesPath, `${route.component}.tsx`);
           if (await fs.pathExists(pageComponentPath)) {
+            // Check if the component uses hooks (needs 'use client')
+            const componentContent = await fs.readFile(pageComponentPath, 'utf-8');
+            const needsClient = componentContent.includes('useState') || 
+                               componentContent.includes('useEffect') || 
+                               componentContent.includes('useRef') ||
+                               componentContent.includes('useCallback') ||
+                               componentContent.includes('useMemo') ||
+                               componentContent.includes("'use client'");
+            
             // Use existing component
-            pageContent = `import ${route.component} from '@/pages/${route.component}'
+            if (needsClient) {
+              pageContent = `'use client'
+
+import ${route.component} from '@/pages/${route.component}'
 
 export default function Page() {
   return <${route.component} />
 }
 `;
+            } else {
+              pageContent = `import ${route.component} from '@/pages/${route.component}'
+
+export default function Page() {
+  return <${route.component} />
+}
+`;
+            }
           } else if (placeholderComponents[route.component]) {
             // Use placeholder
             pageContent = placeholderComponents[route.component];

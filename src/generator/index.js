@@ -683,9 +683,70 @@ export async function generateProject(targetPath, answers) {
       // Update App.tsx to use the template
       if (template === 'empty') {
         const templateAppPath = path.join(templatePath, 'App.tsx');
+        const appTsxPath = path.join(targetSrcPath, 'App.tsx');
         if (await fs.pathExists(templateAppPath)) {
-          const templateAppContent = await fs.readFile(templateAppPath, 'utf-8');
-          const appTsxPath = path.join(targetSrcPath, 'App.tsx');
+          let templateAppContent = await fs.readFile(templateAppPath, 'utf-8');
+          
+          // Wrap with MaterialUI ThemeProvider if MaterialUI is selected
+          if (componentLibrary === 'mui') {
+            // Extract the function body by removing function declaration and export
+            const functionBodyMatch = templateAppContent.match(/function App\(\)\s*\{([\s\S]*)\n\}/);
+            if (functionBodyMatch) {
+              const functionBody = functionBodyMatch[1];
+              templateAppContent = `import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+
+const theme = createTheme({
+  palette: {
+    mode: 'light',
+  },
+});
+
+function AppContent() {${functionBody}
+}
+
+function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AppContent />
+    </ThemeProvider>
+  )
+}
+
+export default App
+`;
+            } else {
+              // Fallback: simple replacement if regex doesn't match
+              templateAppContent = templateAppContent.replace(
+                /export default function App/,
+                'function AppContent'
+              );
+              templateAppContent = `import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+
+const theme = createTheme({
+  palette: {
+    mode: 'light',
+  },
+});
+
+${templateAppContent}
+
+function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AppContent />
+    </ThemeProvider>
+  )
+}
+
+export default App
+`;
+            }
+          }
+          
           await fs.writeFile(appTsxPath, templateAppContent);
         }
       } else {
@@ -694,7 +755,32 @@ export async function generateProject(targetPath, answers) {
         const templateName = template === 'dashboard' ? 'Dashboard' : 'Landing';
         const templateImport = `import ${templateName} from './${templateName}'`;
         
-        const appContent = `${templateImport}
+        // Add MaterialUI ThemeProvider if MaterialUI is selected
+        let appContent = '';
+        if (componentLibrary === 'mui') {
+          appContent = `import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+${templateImport}
+
+const theme = createTheme({
+  palette: {
+    mode: 'light',
+  },
+});
+
+function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <${templateName} />
+    </ThemeProvider>
+  )
+}
+
+export default App
+`;
+        } else {
+          appContent = `${templateImport}
 
 function App() {
   return <${templateName} />
@@ -702,6 +788,7 @@ function App() {
 
 export default App
 `;
+        }
         
         await fs.writeFile(appTsxPath, appContent);
       }

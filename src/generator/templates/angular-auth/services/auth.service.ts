@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core'
 import { HttpClient } from '@angular/common/http'
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs'
 import { tap, catchError } from 'rxjs/operators'
+import { ConfigService } from './config.service'
 
 export interface User {
   id: string
@@ -14,11 +15,16 @@ export interface User {
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = '/api/auth' // TODO: Replace with your backend API URL
+  private apiUrl: string
   private currentUserSubject = new BehaviorSubject<User | null>(null)
   public currentUser$ = this.currentUserSubject.asObservable()
 
-  constructor(private http: HttpClient) {
+  constructor(
+    private http: HttpClient,
+    private configService: ConfigService
+  ) {
+    // Get API base URL from config
+    this.apiUrl = `${this.configService.getApiBaseUrl()}/auth`
     this.initializeAuth()
   }
 
@@ -47,6 +53,7 @@ export class AuthService {
 
   login(email: string, password: string): Observable<User> {
     // TODO: Replace with your backend API call
+    // API base URL is now configured via config.json
     // return this.http.post<{ user: User; token: string }>(`${this.apiUrl}/login`, {
     //   email,
     //   password
@@ -82,6 +89,7 @@ export class AuthService {
 
   register(name: string, email: string, password: string): Observable<User> {
     // TODO: Replace with your backend API call
+    // API base URL is now configured via config.json
     // return this.http.post<{ user: User; token: string }>(`${this.apiUrl}/register`, {
     //   name,
     //   email,

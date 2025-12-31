@@ -845,6 +845,46 @@ export default function RootLayout({
       console.log(chalk.green('✅ Created app/page.tsx\n'));
     }
     
+    // Copy template's public folder (for config.json and other static assets)
+    const templatePath = path.join(__dirname, 'templates', template === 'dashboard' ? 'nextjs-auth' : template);
+    const templatePublicPath = path.join(templatePath, 'public');
+    const targetPublicPath = path.join(targetPath, 'public');
+    
+    if (await fs.pathExists(templatePublicPath)) {
+      await fs.ensureDir(targetPublicPath);
+      await fs.copy(templatePublicPath, targetPublicPath);
+      console.log(chalk.green('✅ Copied template public directory with config.json\n'));
+    } else {
+      // Create public folder with default config.json if template doesn't have one
+      await fs.ensureDir(targetPublicPath);
+      const defaultConfig = {
+        app: {
+          name: projectName,
+          version: '1.0.0',
+          theme: 'light',
+          language: 'en'
+        },
+        api: {
+          baseUrl: 'http://localhost:3000/api',
+          timeout: 5000,
+          retries: 3
+        },
+        features: {
+          analytics: true,
+          notifications: true,
+          darkMode: false
+        },
+        ui: {
+          primaryColor: '#3b82f6',
+          secondaryColor: '#8b5cf6',
+          fontSize: '16px',
+          spacing: '8px'
+        }
+      };
+      await fs.writeJson(path.join(targetPublicPath, 'config.json'), defaultConfig, { spaces: 2 });
+      console.log(chalk.green('✅ Created public directory with config.json\n'));
+    }
+    
     // Install dependencies
     console.log(chalk.blue('📦 Installing dependencies...\n'));
     await installDependencies(targetPath);
@@ -1015,7 +1055,45 @@ async function generateAngularProject(targetPath, answers) {
     const srcPath = path.join(targetPath, 'src');
     await fs.ensureDir(srcPath);
     await fs.ensureDir(path.join(srcPath, 'app'));
-    await fs.ensureDir(path.join(srcPath, 'assets'));
+    const assetsPath = path.join(srcPath, 'assets');
+    await fs.ensureDir(assetsPath);
+    
+    // Copy template's assets folder (for config.json)
+    const templatePath = path.join(__dirname, 'templates', template === 'dashboard' ? 'angular-auth' : template);
+    const templateAssetsPath = path.join(templatePath, 'src', 'assets');
+    
+    if (await fs.pathExists(templateAssetsPath)) {
+      await fs.copy(templateAssetsPath, assetsPath);
+      console.log(chalk.green('✅ Copied template assets with config.json\n'));
+    } else {
+      // Create default config.json if template doesn't have one
+      const defaultConfig = {
+        app: {
+          name: projectName,
+          version: '1.0.0',
+          theme: 'light',
+          language: 'en'
+        },
+        api: {
+          baseUrl: 'http://localhost:3000/api',
+          timeout: 5000,
+          retries: 3
+        },
+        features: {
+          analytics: true,
+          notifications: true,
+          darkMode: false
+        },
+        ui: {
+          primaryColor: '#3b82f6',
+          secondaryColor: '#8b5cf6',
+          fontSize: '16px',
+          spacing: '8px'
+        }
+      };
+      await fs.writeJson(path.join(assetsPath, 'config.json'), defaultConfig, { spaces: 2 });
+      console.log(chalk.green('✅ Created assets directory with config.json\n'));
+    }
     
     // Create index.html
     const indexHtml = `<!doctype html>
@@ -1147,6 +1225,35 @@ const routes: Routes = [];
 })
 export class AppRoutingModule { }`;
     await fs.writeFile(path.join(srcPath, 'app', 'app-routing.module.ts'), appRouting);
+    
+    // Copy template files (services, components, guards, etc.)
+    if (template === 'dashboard' || template === 'angular-auth') {
+      const templatePath = path.join(__dirname, 'templates', 'angular-auth');
+      
+      // Copy services
+      const templateServicesPath = path.join(templatePath, 'services');
+      const targetServicesPath = path.join(srcPath, 'app', 'services');
+      if (await fs.pathExists(templateServicesPath)) {
+        await fs.copy(templateServicesPath, targetServicesPath);
+        console.log(chalk.green('✅ Copied template services (including config.service.ts)\n'));
+      }
+      
+      // Copy components
+      const templateComponentsPath = path.join(templatePath, 'components');
+      const targetComponentsPath = path.join(srcPath, 'app', 'components');
+      if (await fs.pathExists(templateComponentsPath)) {
+        await fs.copy(templateComponentsPath, targetComponentsPath);
+        console.log(chalk.green('✅ Copied template components\n'));
+      }
+      
+      // Copy guards
+      const templateGuardsPath = path.join(templatePath, 'guards');
+      const targetGuardsPath = path.join(srcPath, 'app', 'guards');
+      if (await fs.pathExists(templateGuardsPath)) {
+        await fs.copy(templateGuardsPath, targetGuardsPath);
+        console.log(chalk.green('✅ Copied template guards\n'));
+      }
+    }
     
     console.log(chalk.green('✅ Created Angular project structure\n'));
     
@@ -1298,6 +1405,13 @@ export async function generateProject(targetPath, answers) {
     if (await fs.pathExists(templatePath)) {
       console.log(chalk.blue(`📁 Copying ${template} template files...`));
       
+      // Copy template's public folder (for template-specific config.json)
+      const templatePublicPath = path.join(templatePath, 'public');
+      if (await fs.pathExists(templatePublicPath)) {
+        await fs.copy(templatePublicPath, targetPublicPath);
+        console.log(chalk.blue('📁 Copied template public directory with config.json...'));
+      }
+      
       // Copy all template files to src
       const templateItems = await fs.readdir(templatePath);
       
@@ -1305,6 +1419,11 @@ export async function generateProject(targetPath, answers) {
         const srcItem = path.join(templatePath, item);
         const targetItem = path.join(targetSrcPath, item);
         const stat = await fs.stat(srcItem);
+        
+        // Skip public folder (already copied above)
+        if (item === 'public') {
+          continue;
+        }
         
         if (stat.isDirectory()) {
           await fs.copy(srcItem, targetItem);

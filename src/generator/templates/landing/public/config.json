@@ -1,0 +1,25 @@
+{
+  "app": {
+    "name": "Landing Page",
+    "version": "1.0.0",
+    "theme": "light",
+    "language": "en"
+  },
+  "api": {
+    "baseUrl": "http://localhost:3000/api",
+    "timeout": 5000,
+    "retries": 3
+  },
+  "features": {
+    "analytics": true,
+    "notifications": false,
+    "darkMode": false
+  },
+  "ui": {
+    "primaryColor": "#3b82f6",
+    "secondaryColor": "#8b5cf6",
+    "fontSize": "16px",
+    "spacing": "8px"
+  }
+}
+

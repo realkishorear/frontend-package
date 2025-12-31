@@ -29,14 +29,27 @@ npm install -g jgd-fe-cli
 
 ### Using npx (Recommended)
 
+#### From npm registry:
 ```bash
 npx jgd-fe-cli init my-app
+```
+
+#### From GitHub repository:
+```bash
+# Using github: shorthand (for public repos)
+npx github:realkishorear/frontend-package init web-1
+
+# Or using git+https
+npx git+https://github.com/realkishorear/frontend-package.git init web-1
+
+# Or using git+ssh (for private repos)
+npx git+ssh://git@github.com/realkishorear/frontend-package.git init web-1
 ```
 
 Or initialize in the current directory:
 
 ```bash
-npx jgd-fe-cli init .
+npx github:realkishorear/frontend-package init .
 ```
 
 ## Quick Start

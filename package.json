@@ -71,10 +71,10 @@
   },
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "git+https://github.com/realkishorear/frontend-package.git"
   },
   "bugs": {
-    "url": ""
+    "url": "https://github.com/realkishorear/frontend-package/issues"
   },
-  "homepage": ""
+  "homepage": "https://github.com/realkishorear/frontend-package#readme"
 }

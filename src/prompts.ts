@@ -151,13 +151,14 @@ export async function askQuestions(): Promise<ProjectAnswers> {
     ]);
 
     // Combine all answers
+    // Ensure auth is always set (default to 'none' if not provided)
     const answers: ProjectAnswers = {
       ...frameworkAnswer,
       ...cssAnswer,
       ...componentAnswer,
       ...bundlerAnswer,
       ...stateManagementAnswer,
-      ...authAnswer,
+      auth: authAnswer.auth || 'none',
       ...templateAnswer,
     };
 

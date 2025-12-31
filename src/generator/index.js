@@ -2175,14 +2175,28 @@ body {
               `$1\n${lessRule}`
             );
           } else {
-            // Fallback: find the closing of module.rules array or before image rule
-            // Insert before the first asset/image rule
-            const imageRulePattern = /(\s+)(\{[\s\S]*?test: \/\\\.\(png|jpe\?g|gif|svg\)/);
-            if (imageRulePattern.test(webpackConfig)) {
-              webpackConfig = webpackConfig.replace(
-                imageRulePattern,
-                `${lessRule}\n$1$2`
-              );
+            // Fallback: find the image rule by searching for the test pattern
+            // Look for lines containing "test:" followed by image file extensions
+            const lines = webpackConfig.split('\n');
+            let insertIndex = -1;
+            
+            for (let i = 0; i < lines.length; i++) {
+              if (lines[i].includes('test:') && (lines[i].includes('png') || lines[i].includes('svg') || lines[i].includes('jpe'))) {
+                // Find the start of this rule (look backwards for opening brace)
+                for (let j = i; j >= 0; j--) {
+                  if (lines[j].trim().startsWith('{')) {
+                    insertIndex = j;
+                    break;
+                  }
+                }
+                break;
+              }
+            }
+            
+            if (insertIndex >= 0) {
+              // Insert the less rule before the image rule
+              lines.splice(insertIndex, 0, lessRule);
+              webpackConfig = lines.join('\n');
             } else {
               // Last resort: insert before the closing of rules array
               webpackConfig = webpackConfig.replace(

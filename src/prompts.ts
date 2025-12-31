@@ -42,6 +42,7 @@ export async function askQuestions(): Promise<ProjectAnswers> {
         cssFramework: 'tailwind', // Default for Next.js
         componentLibrary: 'plain', // Default for Next.js
         stateManagement: 'plain', // Default for Next.js
+        auth: 'none', // Default for Next.js
         ...templateAnswer,
       };
     }
@@ -71,9 +72,10 @@ export async function askQuestions(): Promise<ProjectAnswers> {
       { name: '📦 Material UI', value: 'mui', short: 'Material UI' },
     ];
 
-    // Only show Shadcn if React is chosen
+    // Only show Shadcn and AntDesign if React is chosen
     if (frameworkAnswer.framework === 'react') {
       componentChoices.push({ name: '🎨 Shadcn', value: 'shadcn', short: 'Shadcn' });
+      componentChoices.push({ name: '🔷 AntDesign', value: 'antd', short: 'AntDesign' });
     }
 
     componentChoices.push({ name: '📝 Plain', value: 'plain', short: 'Plain' });
@@ -116,7 +118,26 @@ export async function askQuestions(): Promise<ProjectAnswers> {
       },
     ]);
 
-    // Question 6: Template
+    // Question 6: OIDC/Auth (only for React)
+    let authAnswer: { auth?: ProjectAnswers['auth'] } = {};
+    if (frameworkAnswer.framework === 'react') {
+      authAnswer = await inquirer.prompt<{ auth: ProjectAnswers['auth'] }>([
+        {
+          type: 'list',
+          name: 'auth',
+          message: chalk.cyan.bold('\nDo you want to use OIDC/Auth:'),
+          choices: [
+            { name: '🔐 OIDC', value: 'oidc' },
+            { name: '❌ None', value: 'none' },
+          ],
+        },
+      ]);
+    } else {
+      // Default to none for non-React frameworks
+      authAnswer = { auth: 'none' };
+    }
+
+    // Question 7: Template
     const templateAnswer = await inquirer.prompt<{ template: ProjectAnswers['template'] }>([
       {
         type: 'list',
@@ -136,6 +157,7 @@ export async function askQuestions(): Promise<ProjectAnswers> {
       ...componentAnswer,
       ...bundlerAnswer,
       ...stateManagementAnswer,
+      ...authAnswer,
       ...templateAnswer,
     };
 

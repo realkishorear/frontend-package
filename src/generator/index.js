@@ -1284,7 +1284,7 @@ export class AppRoutingModule { }`;
 
 export async function generateProject(targetPath, answers) {
   // Map new answer structure to generator expectations
-  const { framework, cssFramework: cssFrameworkRaw, componentLibrary: componentLibraryRaw, bundler, stateManagement, template: templateRaw } = answers;
+  const { framework, cssFramework: cssFrameworkRaw, componentLibrary: componentLibraryRaw, bundler, stateManagement, auth: authRaw, template: templateRaw } = answers;
   
   // Route to appropriate generator based on framework
   if (framework === 'nextjs') {
@@ -1308,6 +1308,9 @@ export async function generateProject(targetPath, answers) {
   
   // Map state management: 'redux' -> useRedux boolean
   const useRedux = stateManagement === 'redux';
+  
+  // Map auth: 'oidc' -> useOIDC boolean
+  const useOIDC = authRaw === 'oidc';
   
   // Set defaults for removed features
   const useReactQuery = false;
@@ -1994,6 +1997,15 @@ body {
       }
     }
 
+    // ============================================================================
+    // DEPENDENCY ORDERING - Following strict dependency rules:
+    // 1. Bundler (Webpack/Vite) - MUST be installed first (already done in configureBundler)
+    // 2. CSS Framework (Tailwind/Plain CSS) - depends on bundler (already done)
+    // 3. Component Library (MUI/ShadCN/AntDesign) - depends on bundler + CSS framework
+    // 4. Redux (optional) - requires React
+    // 5. OIDC/Auth (optional) - requires React
+    // ============================================================================
+    
     // Update package.json with component library dependencies if needed
     // Read package.json fresh to ensure we have the latest version (after CSS framework changes)
     if (await fs.pathExists(packageJsonPath)) {
@@ -2012,24 +2024,63 @@ body {
         packageJson.dependencies = {};
       }
       
+      // ============================================================================
+      // 3. COMPONENT LIBRARY SETUP
+      // Depends on: Bundler + CSS Framework
+      // ============================================================================
       if (componentLibrary === 'mui') {
+        // MUI requires bundler + React + @emotion/react + @emotion/styled
+        console.log(chalk.blue('✅ Setting up Material UI...'));
         packageJson.dependencies['@mui/material'] = '^5.15.0';
         packageJson.dependencies['@emotion/react'] = '^11.11.0';
         packageJson.dependencies['@emotion/styled'] = '^11.11.0';
+        console.log(chalk.green('✅ Added MUI dependencies to package.json'));
       } else if (componentLibrary === 'antd') {
+        // AntDesign requires bundler + React (+ less-loader if Webpack)
+        console.log(chalk.blue('✅ Setting up AntDesign...'));
         packageJson.dependencies['antd'] = '^5.12.0';
+        
+        // Add less-loader for Webpack (AntDesign uses Less)
+        if (bundler === 'webpack') {
+          if (!packageJson.devDependencies) {
+            packageJson.devDependencies = {};
+          }
+          packageJson.devDependencies['less'] = '^4.2.0';
+          packageJson.devDependencies['less-loader'] = '^12.2.0';
+          console.log(chalk.green('✅ Added AntDesign + less-loader dependencies to package.json'));
+        } else {
+          console.log(chalk.green('✅ Added AntDesign dependencies to package.json'));
+        }
       }
       // Note: shadcn is not added here as it requires separate initialization via CLI
+      // ShadCN requires Tailwind + bundler (already configured)
       
-      // Handle Redux setup
+      // ============================================================================
+      // 4. REDUX SETUP (optional)
+      // Depends on: React
+      // ============================================================================
       if (useRedux) {
-        console.log(chalk.blue('✅ Setting up Redux with Redux Thunk...'));
+        console.log(chalk.blue('✅ Setting up Redux with Redux Toolkit...'));
         
         // Add Redux dependencies
         packageJson.dependencies['@reduxjs/toolkit'] = '^2.0.0';
         packageJson.dependencies['react-redux'] = '^9.0.0';
         
         console.log(chalk.green('✅ Added Redux dependencies to package.json'));
+      }
+      
+      // ============================================================================
+      // 5. OIDC/AUTH SETUP (optional)
+      // Depends on: React
+      // If Redux selected, tokens may be stored there
+      // ============================================================================
+      if (useOIDC) {
+        console.log(chalk.blue('✅ Setting up OIDC/Auth...'));
+        
+        // Use oidc-client-ts for OIDC authentication
+        packageJson.dependencies['oidc-client-ts'] = '^3.0.0';
+        
+        console.log(chalk.green('✅ Added OIDC dependencies to package.json'));
       }
       
       // Handle React Query setup
@@ -2062,8 +2113,93 @@ body {
         console.log(chalk.green('✅ Added framer-motion dependency to package.json'));
       }
       
-      // Save package.json with all dependencies (CSS framework + component library + Redux + React Query + Logger + Animation)
+      // Save package.json with all dependencies in proper order:
+      // 1. Bundler (already configured)
+      // 2. CSS Framework (already configured)
+      // 3. Component Library (configured above)
+      // 4. Redux (configured above if selected)
+      // 5. OIDC/Auth (configured above if selected)
       await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
+    }
+    
+    // ============================================================================
+    // WEBPACK CONFIGURATION UPDATE FOR ANTDESIGN
+    // If AntDesign is selected with Webpack, add less-loader configuration
+    // AntDesign uses Less for styling, so we need less-loader for Webpack
+    // ============================================================================
+    if (componentLibrary === 'antd' && bundler === 'webpack') {
+      console.log(chalk.blue('⚙️  Updating Webpack config for AntDesign (less-loader)...'));
+      
+      const webpackConfigPath = path.join(targetPath, 'webpack.config.js');
+      if (await fs.pathExists(webpackConfigPath)) {
+        let webpackConfig = await fs.readFile(webpackConfigPath, 'utf-8');
+        
+        // Check if less-loader rule already exists
+        if (!webpackConfig.includes('test: /\\.less$/') && !webpackConfig.includes("test: /\\.less$/i")) {
+          // Create less-loader rule
+          const lessRule = `      {
+        test: /\\.less$/i,
+        use: [
+          isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              importLoaders: 2,
+              sourceMap: !isProduction,
+            },
+          },
+          {
+            loader: 'postcss-loader',
+            options: {
+              sourceMap: !isProduction,
+            },
+          },
+          {
+            loader: 'less-loader',
+            options: {
+              lessOptions: {
+                javascriptEnabled: true,
+                sourceMap: !isProduction,
+              },
+            },
+          },
+        ],
+      },`;
+          
+          // Insert after CSS rule, before image/assets rule
+          // Try to find the CSS rule and insert after it
+          const cssRuleEndPattern = /(test: \/\\\.css\$\/i,[\s\S]*?\]\s*\},)/;
+          if (cssRuleEndPattern.test(webpackConfig)) {
+            webpackConfig = webpackConfig.replace(
+              cssRuleEndPattern,
+              `$1\n${lessRule}`
+            );
+          } else {
+            // Fallback: find the closing of module.rules array or before image rule
+            // Insert before the first asset/image rule
+            const imageRulePattern = /(\s+)(\{[\s\S]*?test: \/\\\.\(png|jpe\?g|gif|svg\)/);
+            if (imageRulePattern.test(webpackConfig)) {
+              webpackConfig = webpackConfig.replace(
+                imageRulePattern,
+                `${lessRule}\n$1$2`
+              );
+            } else {
+              // Last resort: insert before the closing of rules array
+              webpackConfig = webpackConfig.replace(
+                /(\s+)\],/,
+                `${lessRule}\n$1],`
+              );
+            }
+          }
+          
+          await fs.writeFile(webpackConfigPath, webpackConfig, 'utf-8');
+          console.log(chalk.green('✅ Updated webpack.config.js with less-loader for AntDesign'));
+        } else {
+          console.log(chalk.yellow('⚠️  less-loader rule already exists in webpack.config.js'));
+        }
+      } else {
+        console.log(chalk.yellow('⚠️  webpack.config.js not found, less-loader rule not added'));
+      }
     }
     
     // Setup Redux store structure if Redux is selected
@@ -2287,6 +2423,406 @@ export default exampleSlice.reducer;
         await fs.writeFile(providerFilePath, mainContent, 'utf-8');
         const fileType = routingType === 'v7' ? 'root layout' : 'main.tsx';
         console.log(chalk.green(`✅ Updated ${fileType} with Redux Provider`));
+      }
+    }
+    
+    // ============================================================================
+    // OIDC/AUTH SETUP
+    // Creates auth service and integrates with Redux if selected
+    // ============================================================================
+    if (useOIDC) {
+      console.log(chalk.blue('📁 Setting up OIDC/Auth structure...'));
+      
+      // Create services directory for auth
+      const servicesDir = path.join(targetSrcPath, 'services');
+      await fs.ensureDir(servicesDir);
+      
+      // Create auth service
+      const authServiceContent = `import { UserManager, User, UserManagerSettings } from 'oidc-client-ts';
+
+// OIDC Configuration
+// Update these values with your OIDC provider settings
+const oidcConfig: UserManagerSettings = {
+  authority: process.env.VITE_OIDC_AUTHORITY || 'https://your-oidc-provider.com',
+  client_id: process.env.VITE_OIDC_CLIENT_ID || 'your-client-id',
+  redirect_uri: process.env.VITE_OIDC_REDIRECT_URI || window.location.origin + '/callback',
+  post_logout_redirect_uri: process.env.VITE_OIDC_POST_LOGOUT_REDIRECT_URI || window.location.origin,
+  response_type: 'code',
+  scope: 'openid profile email',
+  automaticSilentRenew: true,
+  silent_redirect_uri: window.location.origin + '/silent-renew.html',
+  loadUserInfo: true,
+};
+
+// Create UserManager instance
+const userManager = new UserManager(oidcConfig);
+
+// Auth Service
+export class AuthService {
+  /**
+   * Initialize the auth service
+   * Checks for existing user session
+   */
+  async initialize(): Promise<User | null> {
+    try {
+      const user = await userManager.getUser();
+      return user;
+    } catch (error) {
+      console.error('Error initializing auth:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Login - redirects to OIDC provider
+   */
+  async login(): Promise<void> {
+    try {
+      await userManager.signinRedirect();
+    } catch (error) {
+      console.error('Error during login:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle callback after OIDC redirect
+   */
+  async handleCallback(): Promise<User> {
+    try {
+      const user = await userManager.signinRedirectCallback();
+      return user;
+    } catch (error) {
+      console.error('Error handling callback:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Logout
+   */
+  async logout(): Promise<void> {
+    try {
+      await userManager.signoutRedirect();
+    } catch (error) {
+      console.error('Error during logout:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get current user
+   */
+  async getUser(): Promise<User | null> {
+    try {
+      return await userManager.getUser();
+    } catch (error) {
+      console.error('Error getting user:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if user is authenticated
+   */
+  async isAuthenticated(): Promise<boolean> {
+    const user = await this.getUser();
+    return user !== null && !user.expired;
+  }
+
+  /**
+   * Get access token
+   */
+  async getAccessToken(): Promise<string | null> {
+    const user = await this.getUser();
+    return user?.access_token || null;
+  }
+
+  /**
+   * Subscribe to user events
+   */
+  onUserLoaded(callback: (user: User) => void): void {
+    userManager.events.addUserLoaded(callback);
+  }
+
+  onUserUnloaded(callback: () => void): void {
+    userManager.events.addUserUnloaded(callback);
+  }
+
+  onAccessTokenExpiring(callback: () => void): void {
+    userManager.events.addAccessTokenExpiring(callback);
+  }
+
+  onAccessTokenExpired(callback: () => void): void {
+    userManager.events.addAccessTokenExpired(callback);
+  }
+}
+
+// Export singleton instance
+export const authService = new AuthService();
+`;
+      
+      await fs.writeFile(path.join(servicesDir, 'authService.ts'), authServiceContent, 'utf-8');
+      console.log(chalk.green('✅ Created services/authService.ts'));
+      
+      // Create auth context/hook for React components
+      const authContextContent = `import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { User } from 'oidc-client-ts';
+import { authService } from './authService';
+
+interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
+  getAccessToken: () => Promise<string | null>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Initialize auth on mount
+    const initAuth = async () => {
+      try {
+        const currentUser = await authService.initialize();
+        setUser(currentUser);
+        
+        // Subscribe to user events
+        authService.onUserLoaded((loadedUser) => {
+          setUser(loadedUser);
+        });
+        
+        authService.onUserUnloaded(() => {
+          setUser(null);
+        });
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+  }, []);
+
+  const login = async () => {
+    await authService.login();
+  };
+
+  const logout = async () => {
+    await authService.logout();
+  };
+
+  const getAccessToken = async () => {
+    return await authService.getAccessToken();
+  };
+
+  const value: AuthContextType = {
+    user,
+    isLoading,
+    isAuthenticated: user !== null && !user.expired,
+    login,
+    logout,
+    getAccessToken,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+`;
+      
+      await fs.writeFile(path.join(servicesDir, 'authContext.tsx'), authContextContent, 'utf-8');
+      console.log(chalk.green('✅ Created services/authContext.tsx'));
+      
+      // Create callback page component for OIDC redirect
+      const callbackComponentContent = `import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { authService } from './authService';
+
+export default function Callback() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleCallback = async () => {
+      try {
+        await authService.handleCallback();
+        // Redirect to home after successful authentication
+        navigate('/');
+      } catch (error) {
+        console.error('Error handling OIDC callback:', error);
+        navigate('/login');
+      }
+    };
+
+    handleCallback();
+  }, [navigate]);
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <p>Completing login...</p>
+    </div>
+  );
+}
+`;
+      
+      const pagesDir = path.join(targetSrcPath, 'pages');
+      await fs.ensureDir(pagesDir);
+      await fs.writeFile(path.join(pagesDir, 'Callback.tsx'), callbackComponentContent, 'utf-8');
+      console.log(chalk.green('✅ Created pages/Callback.tsx'));
+      
+      // If Redux is selected, create auth slice for storing tokens
+      if (useRedux) {
+        const storeDir = path.join(targetSrcPath, 'store');
+        const slicesDir = path.join(storeDir, 'slices');
+        await fs.ensureDir(slicesDir);
+        
+        const authSliceContent = `import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { User } from 'oidc-client-ts';
+
+interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  accessToken: string | null;
+}
+
+const initialState: AuthState = {
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
+  accessToken: null,
+};
+
+const authSlice = createSlice({
+  name: 'auth',
+  initialState,
+  reducers: {
+    setUser: (state, action: PayloadAction<User | null>) => {
+      state.user = action.payload;
+      state.isAuthenticated = action.payload !== null && !action.payload.expired;
+      state.accessToken = action.payload?.access_token || null;
+    },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.isLoading = action.payload;
+    },
+    clearAuth: (state) => {
+      state.user = null;
+      state.isAuthenticated = false;
+      state.accessToken = null;
+    },
+  },
+});
+
+export const { setUser, setLoading, clearAuth } = authSlice.actions;
+export default authSlice.reducer;
+`;
+        
+        await fs.writeFile(path.join(slicesDir, 'authSlice.ts'), authSliceContent, 'utf-8');
+        console.log(chalk.green('✅ Created store/slices/authSlice.ts'));
+        
+        // Update store.ts to include auth reducer
+        const storePath = path.join(storeDir, 'store.ts');
+        if (await fs.pathExists(storePath)) {
+          let storeContent = await fs.readFile(storePath, 'utf-8');
+          
+          // Add auth reducer import
+          if (!storeContent.includes('authReducer')) {
+            storeContent = storeContent.replace(
+              /import exampleReducer from '\.\/slices\/exampleSlice';/,
+              "import exampleReducer from './slices/exampleSlice';\nimport authReducer from './slices/authSlice';"
+            );
+            
+            // Add auth to reducer
+            storeContent = storeContent.replace(
+              /reducer: {\s*example: exampleReducer,/,
+              'reducer: {\n    example: exampleReducer,\n    auth: authReducer,'
+            );
+            
+            await fs.writeFile(storePath, storeContent, 'utf-8');
+            console.log(chalk.green('✅ Updated store/store.ts with auth reducer'));
+          }
+        }
+      }
+      
+      // Update main.tsx or root layout to include AuthProvider
+      let providerFilePath;
+      if (routingType === 'v7') {
+        providerFilePath = path.join(targetSrcPath, 'routes', '_layout.tsx');
+      } else {
+        providerFilePath = path.join(targetSrcPath, 'main.tsx');
+      }
+      
+      if (await fs.pathExists(providerFilePath)) {
+        let mainContent = await fs.readFile(providerFilePath, 'utf-8');
+        
+        // Add AuthProvider import and wrap
+        if (!mainContent.includes('AuthProvider')) {
+          // Add import
+          if (mainContent.includes("from 'react'")) {
+            mainContent = mainContent.replace(
+              /(import.*from ['"]react['"])/,
+              "$1\nimport { AuthProvider } from './services/authContext';"
+            );
+          } else {
+            mainContent = "import { AuthProvider } from './services/authContext';\n" + mainContent;
+          }
+          
+          // Wrap with AuthProvider (inside Redux Provider if it exists, otherwise at top level)
+          if (mainContent.includes('<Provider')) {
+            // Wrap inside Redux Provider
+            mainContent = mainContent.replace(
+              /(<Provider[^>]*>)/,
+              '$1\n      <AuthProvider>'
+            );
+            mainContent = mainContent.replace(
+              /(<\/Provider>)/,
+              '</AuthProvider>\n    $1'
+            );
+          } else if (mainContent.includes('<ConfigProvider>')) {
+            // Wrap inside ConfigProvider
+            mainContent = mainContent.replace(
+              /(<ConfigProvider>)/,
+              '<AuthProvider>\n      $1'
+            );
+            mainContent = mainContent.replace(
+              /(<\/ConfigProvider>)/,
+              '$1\n    </AuthProvider>'
+            );
+          } else {
+            // Wrap at top level
+            const firstJSX = mainContent.match(/<[A-Z]\w+/);
+            if (firstJSX) {
+              mainContent = mainContent.replace(
+                new RegExp(`(${firstJSX[0]})`),
+                '<AuthProvider>\n      $1'
+              );
+              mainContent = mainContent.replace(
+                /(\);?\s*}$)/,
+                '</AuthProvider>$1'
+              );
+            }
+          }
+          
+          await fs.writeFile(providerFilePath, mainContent, 'utf-8');
+          const fileType = routingType === 'v7' ? 'root layout' : 'main.tsx';
+          console.log(chalk.green(`✅ Updated ${fileType} with AuthProvider`));
+        }
       }
     }
     

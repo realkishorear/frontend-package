@@ -44,6 +44,9 @@ export async function initProject(projectName: string): Promise<void> {
       console.log(chalk.white(`   Bundler: ${chalk.cyan(answers.bundler)}`));
     }
     console.log(chalk.white(`   State Management: ${chalk.cyan(answers.stateManagement)}`));
+    if (answers.auth) {
+      console.log(chalk.white(`   Auth: ${chalk.cyan(answers.auth)}`));
+    }
     console.log(chalk.white(`   Template: ${chalk.cyan(answers.template)}`));
     console.log(chalk.white(`\n   Target: ${chalk.cyan(targetPath)}\n`));
 

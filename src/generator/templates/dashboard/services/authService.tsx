@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth as useOidcAuth } from 'oidc-react'
+import { UserManager } from 'oidc-client-ts'
+import { getOidcConfig, getProviderConfig, type OidcProvider } from '../config/oidc.config'
 
 // Types
 export interface User {
@@ -15,7 +17,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   signIn: () => Promise<void>
   signOut: () => Promise<void>
-  signInRedirect: () => Promise<void>
+  signInRedirect: (provider?: OidcProvider) => Promise<void>
   signOutRedirect: () => Promise<void>
   testLogin: () => void
 }
@@ -152,7 +154,37 @@ export function useAuth(): AuthContextType {
           await authAny.signOutRedirect()
         }
       },
-      signInRedirect: async () => {
+      signInRedirect: async (provider?: OidcProvider) => {
+        // If provider is specified, use provider-specific configuration
+        if (provider) {
+          const providerConfig = getProviderConfig(provider)
+          if (providerConfig && providerConfig.enabled) {
+            try {
+              const oidcConfig = getOidcConfig(provider)
+              const userManager = new UserManager({
+                authority: oidcConfig.authority,
+                client_id: oidcConfig.clientId,
+                redirect_uri: oidcConfig.redirectUri || window.location.origin,
+                post_logout_redirect_uri: oidcConfig.postLogoutRedirectUri || window.location.origin,
+                response_type: oidcConfig.responseType || 'code',
+                scope: oidcConfig.scope || 'openid profile email',
+                automaticSilentRenew: oidcConfig.automaticSilentRenew,
+                loadUserInfo: oidcConfig.loadUserInfo,
+                silent_redirect_uri: oidcConfig.silentRedirectUri || `${window.location.origin}/silent-renew.html`,
+                ...(oidcConfig.extraQueryParams && { extraQueryParams: oidcConfig.extraQueryParams }),
+              })
+              await userManager.signinRedirect()
+              return
+            } catch (err: any) {
+              console.error(`Error signing in with ${provider}:`, err)
+              throw new Error(`Failed to sign in with ${providerConfig.name}: ${err.message}`)
+            }
+          } else {
+            throw new Error(`${providerConfig?.name || provider} is not configured`)
+          }
+        }
+        
+        // Default: use the AuthProvider's configuration
         if (authAny.signInRedirect) {
           await authAny.signInRedirect()
         } else if (authAny.signIn) {
@@ -190,7 +222,35 @@ export function useAuth(): AuthContextType {
           setTestUserState(null)
           window.location.href = '/login'
         },
-        signInRedirect: async () => {
+        signInRedirect: async (provider?: OidcProvider) => {
+          // Try provider-specific configuration even if AuthProvider is not available
+          if (provider) {
+            const providerConfig = getProviderConfig(provider)
+            if (providerConfig && providerConfig.enabled) {
+              try {
+                const oidcConfig = getOidcConfig(provider)
+                const userManager = new UserManager({
+                  authority: oidcConfig.authority,
+                  client_id: oidcConfig.clientId,
+                  redirect_uri: oidcConfig.redirectUri || window.location.origin,
+                  post_logout_redirect_uri: oidcConfig.postLogoutRedirectUri || window.location.origin,
+                  response_type: oidcConfig.responseType || 'code',
+                  scope: oidcConfig.scope || 'openid profile email',
+                  automaticSilentRenew: oidcConfig.automaticSilentRenew,
+                  loadUserInfo: oidcConfig.loadUserInfo,
+                  silent_redirect_uri: oidcConfig.silentRedirectUri || `${window.location.origin}/silent-renew.html`,
+                  ...(oidcConfig.extraQueryParams && { extraQueryParams: oidcConfig.extraQueryParams }),
+                })
+                await userManager.signinRedirect()
+                return
+              } catch (err: any) {
+                console.error(`Error signing in with ${provider}:`, err)
+                throw new Error(`Failed to sign in with ${providerConfig.name}: ${err.message}`)
+              }
+            } else {
+              throw new Error(`${providerConfig?.name || provider} is not configured`)
+            }
+          }
           console.warn('OIDC is not configured. Use test login for development.')
         },
         signOutRedirect: async () => {

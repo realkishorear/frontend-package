@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Home from './pages/Home'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
 import ProtectedRoute from './components/ProtectedRoute'
+import { useAuth } from './services/authService'
 
 // Placeholder pages for other routes
 function Users() {
@@ -66,6 +67,7 @@ function Reports() {
 function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const auth = useAuth()
 
   useEffect(() => {
     const checkMobile = () => {
@@ -90,6 +92,20 @@ function Dashboard() {
     if (isMobile) {
       setSidebarOpen(false)
     }
+  }
+
+  // Redirect to login if not authenticated
+  if (!auth.loading && !auth.isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  // Show loading while checking auth
+  if (auth.loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
   }
 
   return (

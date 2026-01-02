@@ -6,15 +6,11 @@ import { useAuth } from '../services/authService'
 
 function Login() {
   const [error, setError] = useState('')
-  const { signInRedirect, isAuthenticated, loading, testLogin } = useAuth()
+  const { signInRedirect, isAuthenticated, loading, testLogin, signOut } = useAuth()
   const navigate = useNavigate()
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (!loading && isAuthenticated) {
-      navigate('/dashboard', { replace: true })
-    }
-  }, [isAuthenticated, loading, navigate])
+  // Don't auto-redirect - let users see the login page even if authenticated
+  // They can manually navigate to dashboard or logout if needed
 
   const handleOIDCLogin = async () => {
     try {
@@ -31,6 +27,14 @@ function Login() {
     setError('')
     // Use test login to bypass OIDC
     testLogin()
+  }
+
+  const handleClearTestMode = () => {
+    // Clear test mode from localStorage
+    localStorage.removeItem('dashboard_test_mode')
+    localStorage.removeItem('dashboard_test_user')
+    // Reload page to reset state
+    window.location.reload()
   }
 
   const handleOAuthLogin = async (provider: 'github' | 'twitter') => {
@@ -135,6 +139,33 @@ function Login() {
             Twitter
           </button>
         </div>
+
+        {/* Show message if already authenticated */}
+        {!loading && isAuthenticated && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm">
+            <p className="font-medium">⚠️ You are already logged in</p>
+            <p className="text-xs mt-1 text-yellow-700">
+              To see the login page, please logout first.
+            </p>
+            <div className="mt-3 flex gap-3">
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+              >
+                Go to Dashboard
+              </button>
+              <button
+                onClick={async () => {
+                  await signOut()
+                  handleClearTestMode()
+                }}
+                className="px-3 py-1.5 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
+              >
+                Logout & Clear
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Configuration Note */}
         <div className="text-center text-xs text-gray-500 pt-4 border-t border-gray-200">

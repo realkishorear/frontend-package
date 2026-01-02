@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth as useOidcAuth } from 'oidc-react'
 import { UserManager } from 'oidc-client-ts'
-import { getOidcConfig, getProviderConfig, type OidcProvider } from '../config/oidc.config'
+import { getOidcConfig, getProviderConfig, type OidcProvider, type ExtendedOidcConfig } from '../config/oidc.config'
 
 // Types
 export interface User {

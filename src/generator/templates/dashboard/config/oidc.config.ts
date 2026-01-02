@@ -1,5 +1,11 @@
 import { AuthProviderProps } from 'oidc-react'
 
+// Extended config interface that includes extraQueryParams for UserManager
+// This extends AuthProviderProps to support extraQueryParams which is used with UserManager
+export interface ExtendedOidcConfig extends AuthProviderProps {
+  extraQueryParams?: Record<string, string>
+}
+
 /**
  * OIDC Configuration - Multi-Provider Support
  * 
@@ -131,7 +137,7 @@ export const getEnabledProviders = (): Array<{ provider: OidcProvider; config: P
 }
 
 // Get OIDC config for a specific provider
-export const getOidcConfig = (provider: OidcProvider = 'default'): AuthProviderProps => {
+export const getOidcConfig = (provider: OidcProvider = 'default'): ExtendedOidcConfig => {
   const providerConfig = getProviderConfig(provider)
   
   if (!providerConfig || !providerConfig.enabled) {
@@ -153,20 +159,13 @@ export const getOidcConfig = (provider: OidcProvider = 'default'): AuthProviderP
 }
 
 // Create OIDC config from provider config
-const createOidcConfig = (providerConfig: ProviderConfig, provider?: OidcProvider): AuthProviderProps => {
+const createOidcConfig = (providerConfig: ProviderConfig, provider?: OidcProvider): ExtendedOidcConfig => {
   const baseRedirectUri = getEnvVar('REACT_APP_OIDC_REDIRECT_URI', window.location.origin)
   
-  // For Auth0 with connections, add connection parameter
-  let redirectUri = baseRedirectUri
-  if (provider === 'facebook' && providerConfig.connection) {
-    // Auth0 supports connection parameter in redirect_uri or as extraQueryParams
-    redirectUri = baseRedirectUri
-  }
-  
-  const config: AuthProviderProps = {
+  const config: ExtendedOidcConfig = {
     authority: providerConfig.authority || 'https://placeholder-oidc-provider.com',
     clientId: providerConfig.clientId || 'placeholder-client-id',
-    redirectUri,
+    redirectUri: baseRedirectUri,
     postLogoutRedirectUri: getEnvVar('REACT_APP_OIDC_POST_LOGOUT_REDIRECT_URI', window.location.origin),
     responseType: 'code',
     scope: getEnvVar('REACT_APP_OIDC_SCOPE', 'openid profile email'),
@@ -182,8 +181,9 @@ const createOidcConfig = (providerConfig: ProviderConfig, provider?: OidcProvide
   }
   
   // For Auth0 with Facebook connection, add connection parameter
+  // Note: extraQueryParams is only used with UserManager, not AuthProvider
   if (provider === 'facebook' && providerConfig.connection && providerConfig.authority.includes('auth0.com')) {
-    // Auth0 requires connection parameter in extraQueryParams
+    // Auth0 requires connection parameter in extraQueryParams for UserManager
     config.extraQueryParams = {
       connection: providerConfig.connection,
     }
@@ -199,6 +199,7 @@ export const isOidcConfigured = (): boolean => {
 }
 
 // Default OIDC config (for backward compatibility)
+// Note: AuthProvider only uses AuthProviderProps properties, extraQueryParams is ignored
 export const oidcConfig: AuthProviderProps = getOidcConfig('default')
 
 /**

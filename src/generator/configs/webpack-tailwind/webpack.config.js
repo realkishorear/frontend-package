@@ -2,6 +2,7 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const webpack = require('webpack');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -71,6 +72,14 @@ module.exports = {
           noErrorOnMissing: true,
         },
       ],
+    }),
+    // Inject environment variables
+    new webpack.DefinePlugin({
+      'process.env.REACT_APP_OIDC_AUTHORITY': JSON.stringify(process.env.REACT_APP_OIDC_AUTHORITY || ''),
+      'process.env.REACT_APP_OIDC_CLIENT_ID': JSON.stringify(process.env.REACT_APP_OIDC_CLIENT_ID || ''),
+      'process.env.REACT_APP_OIDC_REDIRECT_URI': JSON.stringify(process.env.REACT_APP_OIDC_REDIRECT_URI || ''),
+      'process.env.REACT_APP_OIDC_POST_LOGOUT_REDIRECT_URI': JSON.stringify(process.env.REACT_APP_OIDC_POST_LOGOUT_REDIRECT_URI || ''),
+      'process.env.REACT_APP_OIDC_SILENT_REDIRECT_URI': JSON.stringify(process.env.REACT_APP_OIDC_SILENT_REDIRECT_URI || ''),
     }),
     ...(isProduction
       ? [

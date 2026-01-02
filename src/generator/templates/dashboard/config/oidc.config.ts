@@ -16,19 +16,38 @@ import { AuthProviderProps } from 'oidc-react'
  * - clientId: Your Auth0 Application Client ID
  * - redirectUri: `http://localhost:5173` (or your production URL)
  */
+// Helper to safely get environment variables
+// For webpack: process.env is replaced by DefinePlugin at build time (becomes a string literal)
+// For vite: import.meta.env is used
+// This function safely handles both cases
+const getEnvVar = (key: string, defaultValue: string): string => {
+  // Webpack DefinePlugin replaces process.env.KEY with the actual string value at build time
+  // So we check if the value exists and is not undefined
+  try {
+    // @ts-ignore - process.env is replaced by webpack DefinePlugin
+    const value = process?.env?.[key]
+    if (value && typeof value === 'string' && value !== 'undefined') {
+      return value
+    }
+  } catch (e) {
+    // process is not defined (browser environment without DefinePlugin)
+  }
+  return defaultValue
+}
+
 export const oidcConfig: AuthProviderProps = {
   // Your OIDC provider's authority URL
   // Example: 'https://your-oidc-provider.com'
-  authority: process.env.REACT_APP_OIDC_AUTHORITY || 'https://your-oidc-provider.com',
+  authority: getEnvVar('REACT_APP_OIDC_AUTHORITY', 'https://your-oidc-provider.com'),
   
   // Your application's client ID
-  clientId: process.env.REACT_APP_OIDC_CLIENT_ID || 'your-client-id',
+  clientId: getEnvVar('REACT_APP_OIDC_CLIENT_ID', 'your-client-id'),
   
   // Redirect URI after authentication
-  redirectUri: process.env.REACT_APP_OIDC_REDIRECT_URI || window.location.origin,
+  redirectUri: getEnvVar('REACT_APP_OIDC_REDIRECT_URI', window.location.origin),
   
   // Post logout redirect URI
-  postLogoutRedirectUri: process.env.REACT_APP_OIDC_POST_LOGOUT_REDIRECT_URI || window.location.origin,
+  postLogoutRedirectUri: getEnvVar('REACT_APP_OIDC_POST_LOGOUT_REDIRECT_URI', window.location.origin),
   
   // Response type - typically 'code' for Authorization Code Flow
   responseType: 'code',
@@ -43,7 +62,7 @@ export const oidcConfig: AuthProviderProps = {
   loadUserInfo: true,
   
   // Silent redirect URI for token renewal
-  silentRedirectUri: process.env.REACT_APP_OIDC_SILENT_REDIRECT_URI || `${window.location.origin}/silent-renew.html`,
+  silentRedirectUri: getEnvVar('REACT_APP_OIDC_SILENT_REDIRECT_URI', `${window.location.origin}/silent-renew.html`),
   
   // Additional settings
   onSignIn: () => {

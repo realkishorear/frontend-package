@@ -98,16 +98,6 @@ export const oidcConfig: AuthProviderProps = {
   // Silent redirect URI for token renewal
   silentRedirectUri: getEnvVar('REACT_APP_OIDC_SILENT_REDIRECT_URI', `${window.location.origin}/silent-renew.html`),
   
-  // Error handling - prevent crashes when OIDC is not configured
-  onError: (error) => {
-    if (!isOidcConfigured()) {
-      console.warn('OIDC is not configured. Please set up your OIDC provider in .env file.')
-      console.warn('See config/oidc.config.ts for setup instructions.')
-      return
-    }
-    console.error('OIDC Error:', error)
-  },
-  
   // Additional settings
   onSignIn: () => {
     console.log('User signed in successfully')

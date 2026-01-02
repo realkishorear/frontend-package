@@ -15,10 +15,10 @@ function App() {
       <Route path="/register" element={<Register />} />
       
       {/* Protected Dashboard Routes */}
-      <Route path="/*" element={<Dashboard />} />
+      <Route path="/dashboard/*" element={<Dashboard />} />
       
-      {/* Default redirect */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      {/* Default redirect to login page */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
     </Routes>
   )
 

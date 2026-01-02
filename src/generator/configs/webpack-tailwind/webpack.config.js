@@ -32,13 +32,19 @@ module.exports = {
           {
             loader: 'css-loader',
             options: {
-              importLoaders: 1,
+              importLoaders: 2, // PostCSS processes after css-loader, and Tailwind runs in PostCSS
               sourceMap: !isProduction,
             },
           },
           {
             loader: 'postcss-loader',
             options: {
+              postcssOptions: {
+                plugins: [
+                  require('tailwindcss'),
+                  require('autoprefixer'),
+                ],
+              },
               sourceMap: !isProduction,
             },
           },

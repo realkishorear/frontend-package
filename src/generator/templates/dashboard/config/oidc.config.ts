@@ -1,32 +1,47 @@
 import { AuthProviderProps } from 'oidc-react'
 
 /**
- * OIDC Configuration
+ * OIDC Configuration - Open-ended setup for OAuth/OIDC providers
  * 
- * TODO: Replace these values with your actual OIDC provider settings
+ * This configuration supports any OIDC-compliant provider including:
+ * - Microsoft Azure AD / Entra ID
+ * - Google OAuth 2.0
+ * - Facebook (via OIDC bridge or Auth0)
+ * - Auth0
+ * - Keycloak
+ * - Okta
+ * - Custom OIDC providers
  * 
- * Common OIDC Providers:
- * - Auth0: https://auth0.com/docs/quickstart/spa/react
- * - Keycloak: https://www.keycloak.org/docs/latest/securing_apps/
- * - Okta: https://developer.okta.com/docs/guides/sign-into-spa/react/before-you-begin/
- * - Azure AD: https://learn.microsoft.com/en-us/azure/active-directory/develop/tutorial-v2-react
+ * SETUP INSTRUCTIONS:
+ * 1. Create a .env file in your project root
+ * 2. Add your OIDC provider credentials (see examples below)
+ * 3. Restart your dev server
  * 
- * Example configuration for Auth0:
- * - authority: `https://YOUR_DOMAIN.auth0.com`
- * - clientId: Your Auth0 Application Client ID
- * - redirectUri: `http://localhost:5173` (or your production URL)
+ * EXAMPLE CONFIGURATIONS:
+ * 
+ * Microsoft Azure AD:
+ * REACT_APP_OIDC_AUTHORITY=https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0
+ * REACT_APP_OIDC_CLIENT_ID=your-azure-app-client-id
+ * 
+ * Google OAuth:
+ * REACT_APP_OIDC_AUTHORITY=https://accounts.google.com
+ * REACT_APP_OIDC_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+ * 
+ * Facebook (via Auth0 or custom OIDC):
+ * REACT_APP_OIDC_AUTHORITY=https://YOUR_DOMAIN.auth0.com (if using Auth0)
+ * REACT_APP_OIDC_CLIENT_ID=your-auth0-client-id
+ * 
+ * Auth0:
+ * REACT_APP_OIDC_AUTHORITY=https://YOUR_DOMAIN.auth0.com
+ * REACT_APP_OIDC_CLIENT_ID=your-auth0-client-id
  */
+
 // Helper to safely get environment variables
-// For webpack: process.env is replaced by DefinePlugin at build time (becomes a string literal)
-// For vite: import.meta.env is used
-// This function safely handles both cases
 const getEnvVar = (key: string, defaultValue: string): string => {
-  // Webpack DefinePlugin replaces process.env.KEY with the actual string value at build time
-  // So we check if the value exists and is not undefined
   try {
     // @ts-ignore - process.env is replaced by webpack DefinePlugin
     const value = process?.env?.[key]
-    if (value && typeof value === 'string' && value !== 'undefined') {
+    if (value && typeof value === 'string' && value !== 'undefined' && value.trim() !== '') {
       return value
     }
   } catch (e) {
@@ -35,13 +50,32 @@ const getEnvVar = (key: string, defaultValue: string): string => {
   return defaultValue
 }
 
+// Check if OIDC is properly configured (not using placeholder values)
+export const isOidcConfigured = (): boolean => {
+  const authority = getEnvVar('REACT_APP_OIDC_AUTHORITY', '')
+  const clientId = getEnvVar('REACT_APP_OIDC_CLIENT_ID', '')
+  
+  return (
+    authority !== '' &&
+    authority !== 'https://your-oidc-provider.com' &&
+    authority !== 'https://placeholder-oidc-provider.com' &&
+    clientId !== '' &&
+    clientId !== 'your-client-id' &&
+    clientId !== 'placeholder-client-id'
+  )
+}
+
+// Get configuration values
+const authority = getEnvVar('REACT_APP_OIDC_AUTHORITY', '')
+const clientId = getEnvVar('REACT_APP_OIDC_CLIENT_ID', '')
+
 export const oidcConfig: AuthProviderProps = {
   // Your OIDC provider's authority URL
-  // Example: 'https://your-oidc-provider.com'
-  authority: getEnvVar('REACT_APP_OIDC_AUTHORITY', 'https://your-oidc-provider.com'),
+  // Use placeholder values if not configured to prevent network errors
+  authority: authority || 'https://placeholder-oidc-provider.com',
   
   // Your application's client ID
-  clientId: getEnvVar('REACT_APP_OIDC_CLIENT_ID', 'your-client-id'),
+  clientId: clientId || 'placeholder-client-id',
   
   // Redirect URI after authentication
   redirectUri: getEnvVar('REACT_APP_OIDC_REDIRECT_URI', window.location.origin),
@@ -53,7 +87,7 @@ export const oidcConfig: AuthProviderProps = {
   responseType: 'code',
   
   // Scope - what information you want from the identity provider
-  scope: 'openid profile email',
+  scope: getEnvVar('REACT_APP_OIDC_SCOPE', 'openid profile email'),
   
   // Automatic silent renew
   automaticSilentRenew: true,
@@ -64,30 +98,71 @@ export const oidcConfig: AuthProviderProps = {
   // Silent redirect URI for token renewal
   silentRedirectUri: getEnvVar('REACT_APP_OIDC_SILENT_REDIRECT_URI', `${window.location.origin}/silent-renew.html`),
   
+  // Error handling - prevent crashes when OIDC is not configured
+  onError: (error) => {
+    if (!isOidcConfigured()) {
+      console.warn('OIDC is not configured. Please set up your OIDC provider in .env file.')
+      console.warn('See config/oidc.config.ts for setup instructions.')
+      return
+    }
+    console.error('OIDC Error:', error)
+  },
+  
   // Additional settings
   onSignIn: () => {
-    // Called after successful sign in
     console.log('User signed in successfully')
-    // You can redirect here if needed
-    // window.location.href = '/dashboard'
   },
   
   onSignOut: () => {
-    // Called after sign out
     console.log('User signed out')
   },
-  
-  // Optional: Custom user store
-  // userStore: new WebStorageStateStore({ store: window.localStorage }),
 }
 
 /**
- * Environment variables needed (create a .env file):
+ * ENVIRONMENT VARIABLES SETUP
  * 
- * REACT_APP_OIDC_AUTHORITY=https://your-oidc-provider.com
+ * Create a .env file in your project root with the following variables:
+ * 
+ * REQUIRED:
+ * REACT_APP_OIDC_AUTHORITY=your-oidc-provider-authority-url
  * REACT_APP_OIDC_CLIENT_ID=your-client-id
- * REACT_APP_OIDC_REDIRECT_URI=http://localhost:5173
- * REACT_APP_OIDC_POST_LOGOUT_REDIRECT_URI=http://localhost:5173
- * REACT_APP_OIDC_SILENT_REDIRECT_URI=http://localhost:5173/silent-renew.html
+ * 
+ * OPTIONAL (defaults provided):
+ * REACT_APP_OIDC_REDIRECT_URI=http://localhost:3000 (defaults to window.location.origin)
+ * REACT_APP_OIDC_POST_LOGOUT_REDIRECT_URI=http://localhost:3000 (defaults to window.location.origin)
+ * REACT_APP_OIDC_SILENT_REDIRECT_URI=http://localhost:3000/silent-renew.html
+ * REACT_APP_OIDC_SCOPE=openid profile email (defaults to 'openid profile email')
+ * 
+ * PROVIDER-SPECIFIC EXAMPLES:
+ * 
+ * 1. Microsoft Azure AD / Entra ID:
+ *    REACT_APP_OIDC_AUTHORITY=https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0
+ *    REACT_APP_OIDC_CLIENT_ID=your-azure-app-client-id
+ *    REACT_APP_OIDC_SCOPE=openid profile email
+ *    Note: Register your app in Azure Portal > App registrations
+ * 
+ * 2. Google OAuth 2.0:
+ *    REACT_APP_OIDC_AUTHORITY=https://accounts.google.com
+ *    REACT_APP_OIDC_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+ *    REACT_APP_OIDC_SCOPE=openid profile email
+ *    Note: Create OAuth 2.0 credentials in Google Cloud Console
+ * 
+ * 3. Facebook (via Auth0 or custom OIDC bridge):
+ *    REACT_APP_OIDC_AUTHORITY=https://YOUR_DOMAIN.auth0.com
+ *    REACT_APP_OIDC_CLIENT_ID=your-auth0-client-id
+ *    REACT_APP_OIDC_SCOPE=openid profile email
+ *    Note: Configure Facebook as a social connection in Auth0
+ * 
+ * 4. Auth0:
+ *    REACT_APP_OIDC_AUTHORITY=https://YOUR_DOMAIN.auth0.com
+ *    REACT_APP_OIDC_CLIENT_ID=your-auth0-client-id
+ *    REACT_APP_OIDC_SCOPE=openid profile email
+ * 
+ * 5. Keycloak:
+ *    REACT_APP_OIDC_AUTHORITY=https://your-keycloak-server.com/realms/your-realm
+ *    REACT_APP_OIDC_CLIENT_ID=your-keycloak-client-id
+ *    REACT_APP_OIDC_SCOPE=openid profile email
+ * 
+ * For more details, see: https://github.com/bjerkio/oidc-react
  */
 

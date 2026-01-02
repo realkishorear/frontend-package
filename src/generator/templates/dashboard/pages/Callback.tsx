@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from 'oidc-react'
+import { useAuth } from '../services/authService'
 
 /**
  * OIDC Callback Page
@@ -18,11 +18,11 @@ export default function Callback() {
     if (auth.isAuthenticated) {
       // Redirect to dashboard after successful authentication
       navigate('/dashboard', { replace: true })
-    } else if (!auth.isLoading) {
+    } else if (!auth.loading) {
       // If not loading and not authenticated, redirect to login
       navigate('/login', { replace: true })
     }
-  }, [auth.isAuthenticated, auth.isLoading, navigate])
+  }, [auth.isAuthenticated, auth.loading, navigate])
 
   // Show loading state while processing callback
   return (

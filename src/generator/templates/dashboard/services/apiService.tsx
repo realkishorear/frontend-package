@@ -20,8 +20,8 @@ export async function apiCall<T = any>(
   const baseUrl = getApiBaseUrl()
   const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`
   
-  const configManager = getConfigManager()
-  const timeout = configManager.get<number>('api.timeout', 5000)
+  // Default timeout from config
+  const timeout = 5000
   
   // Create abort controller for timeout
   const controller = new AbortController()

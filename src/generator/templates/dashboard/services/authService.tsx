@@ -37,21 +37,40 @@ export function useAuth(): AuthContextType {
       }
     : null
 
+  // Handle oidc-react API - use type assertions for properties that may not be in the type definition
+  const authAny = auth as any
+
   return {
     user,
     loading: auth.isLoading,
-    isAuthenticated: auth.isAuthenticated,
+    isAuthenticated: authAny.isAuthenticated ?? !!auth.userData,
     signIn: async () => {
-      await auth.signIn()
+      if (authAny.signIn) {
+        await authAny.signIn()
+      } else if (authAny.signInRedirect) {
+        await authAny.signInRedirect()
+      }
     },
     signOut: async () => {
-      await auth.signOut()
+      if (authAny.signOut) {
+        await authAny.signOut()
+      } else if (authAny.signOutRedirect) {
+        await authAny.signOutRedirect()
+      }
     },
     signInRedirect: async () => {
-      await auth.signInRedirect()
+      if (authAny.signInRedirect) {
+        await authAny.signInRedirect()
+      } else if (authAny.signIn) {
+        await authAny.signIn()
+      }
     },
     signOutRedirect: async () => {
-      await auth.signOutRedirect()
+      if (authAny.signOutRedirect) {
+        await authAny.signOutRedirect()
+      } else if (authAny.signOut) {
+        await authAny.signOut()
+      }
     },
   }
 }

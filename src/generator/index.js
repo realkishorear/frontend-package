@@ -1402,6 +1402,20 @@ export async function generateProject(targetPath, answers) {
             mainContent = mainContent.replace(/\s*<\/ConfigProvider>/g, '');
           }
           
+          // Ensure CSS import is present (it should be from base, but verify)
+          if (!mainContent.includes("import './index.css'") && !mainContent.includes('import "./index.css"')) {
+            // Add CSS import after React imports
+            if (mainContent.includes("from 'react'")) {
+              mainContent = mainContent.replace(
+                /(import.*from ['"]react['"])/,
+                "$1\nimport './index.css'"
+              );
+            } else {
+              // Add at the top if no React import found
+              mainContent = "import './index.css'\n" + mainContent;
+            }
+          }
+          
           await fs.writeFile(mainTsxPath, mainContent, 'utf-8');
         }
       }

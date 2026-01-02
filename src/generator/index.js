@@ -1505,15 +1505,96 @@ export default App
           await fs.writeFile(appTsxPath, templateAppContent);
         }
       } else {
-        // For dashboard and landing, import the main component
+        // For dashboard and landing templates
         const appTsxPath = path.join(targetSrcPath, 'App.tsx');
-        const templateName = template === 'dashboard' ? 'Dashboard' : 'Landing';
-        const templateImport = `import ${templateName} from './${templateName}'`;
         
-        // Add MaterialUI ThemeProvider if MaterialUI is selected
-        let appContent = '';
-        if (componentLibrary === 'mui') {
-          appContent = `import { ThemeProvider, createTheme } from '@mui/material/styles';
+        // Check if template has its own App.tsx (dashboard template does for OIDC)
+        const templateAppPath = path.join(templatePath, 'App.tsx');
+        if (await fs.pathExists(templateAppPath)) {
+          // Use the template's App.tsx (dashboard template includes AuthProvider)
+          let templateAppContent = await fs.readFile(templateAppPath, 'utf-8');
+          
+          // Wrap with MaterialUI ThemeProvider if MaterialUI is selected
+          if (componentLibrary === 'mui') {
+            // Check if AuthProvider is already present (dashboard template)
+            if (templateAppContent.includes('AuthProvider')) {
+              // Add MUI imports after existing imports
+              if (!templateAppContent.includes('@mui/material/styles')) {
+                // Find the last import statement
+                const lastImportMatch = templateAppContent.match(/(import[^;]+;[\s\n]*)+/);
+                if (lastImportMatch) {
+                  templateAppContent = templateAppContent.replace(
+                    lastImportMatch[0],
+                    lastImportMatch[0] + "import { ThemeProvider, createTheme } from '@mui/material/styles';\nimport CssBaseline from '@mui/material/CssBaseline';\n"
+                  );
+                } else {
+                  // No imports found, add at the top
+                  templateAppContent = "import { ThemeProvider, createTheme } from '@mui/material/styles';\nimport CssBaseline from '@mui/material/CssBaseline';\n" + templateAppContent;
+                }
+              }
+              
+              // Add theme constant before function App
+              if (!templateAppContent.includes('const theme = createTheme')) {
+                templateAppContent = templateAppContent.replace(
+                  /(function App\(\))/,
+                  "const theme = createTheme({\n  palette: {\n    mode: 'light',\n  },\n});\n\n$1"
+                );
+              }
+              
+              // Wrap AuthProvider's children with ThemeProvider
+              templateAppContent = templateAppContent.replace(
+                /(<AuthProvider[^>]*>)/,
+                '$1\n      <ThemeProvider theme={theme}>\n        <CssBaseline />'
+              );
+              
+              templateAppContent = templateAppContent.replace(
+                /(<\/AuthProvider>)/,
+                '      </ThemeProvider>\n    $1'
+              );
+            } else {
+              // No AuthProvider, wrap normally
+              if (!templateAppContent.includes('@mui/material/styles')) {
+                const lastImportMatch = templateAppContent.match(/(import[^;]+;[\s\n]*)+/);
+                if (lastImportMatch) {
+                  templateAppContent = templateAppContent.replace(
+                    lastImportMatch[0],
+                    lastImportMatch[0] + "import { ThemeProvider, createTheme } from '@mui/material/styles';\nimport CssBaseline from '@mui/material/CssBaseline';\n"
+                  );
+                } else {
+                  templateAppContent = "import { ThemeProvider, createTheme } from '@mui/material/styles';\nimport CssBaseline from '@mui/material/CssBaseline';\n" + templateAppContent;
+                }
+              }
+              
+              if (!templateAppContent.includes('const theme = createTheme')) {
+                templateAppContent = templateAppContent.replace(
+                  /(function App\(\))/,
+                  "const theme = createTheme({\n  palette: {\n    mode: 'light',\n  },\n});\n\n$1"
+                );
+              }
+              
+              // Wrap return content
+              templateAppContent = templateAppContent.replace(
+                /(return\s*\([^)]*<)/,
+                '$1<ThemeProvider theme={theme}>\n        <CssBaseline />\n        '
+              );
+              
+              templateAppContent = templateAppContent.replace(
+                /(<\/[^>]+>[^)]*\))/,
+                '      </ThemeProvider>\n$1'
+              );
+            }
+          }
+          
+          await fs.writeFile(appTsxPath, templateAppContent);
+        } else {
+          // Template doesn't have App.tsx, generate one
+          const templateName = template === 'dashboard' ? 'Dashboard' : 'Landing';
+          const templateImport = `import ${templateName} from './${templateName}'`;
+          
+          // Add MaterialUI ThemeProvider if MaterialUI is selected
+          let appContent = '';
+          if (componentLibrary === 'mui') {
+            appContent = `import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 ${templateImport}
 
@@ -1534,8 +1615,8 @@ function App() {
 
 export default App
 `;
-        } else {
-          appContent = `${templateImport}
+          } else {
+            appContent = `${templateImport}
 
 function App() {
   return <${templateName} />
@@ -1543,9 +1624,10 @@ function App() {
 
 export default App
 `;
+          }
+          
+          await fs.writeFile(appTsxPath, appContent);
         }
-        
-        await fs.writeFile(appTsxPath, appContent);
       }
     }
 

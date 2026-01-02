@@ -1,4 +1,3 @@
-import { useContext } from 'react'
 import { useAuth as useOidcAuth } from 'oidc-react'
 
 // Types
@@ -28,12 +27,13 @@ export function useAuth(): AuthContextType {
   const auth = useOidcAuth()
 
   // Transform OIDC user to our User type
+  // userData from oidc-react can have various properties depending on the OIDC provider
   const user: User | null = auth.userData
     ? {
-        id: auth.userData.sub || auth.userData.id || '',
-        name: auth.userData.name || auth.userData.preferred_username || '',
-        email: auth.userData.email || '',
-        avatar: auth.userData.picture || auth.userData.avatar_url,
+        id: (auth.userData as any).sub || (auth.userData as any).id || '',
+        name: (auth.userData as any).name || (auth.userData as any).preferred_username || '',
+        email: (auth.userData as any).email || '',
+        avatar: (auth.userData as any).picture || (auth.userData as any).avatar_url,
       }
     : null
 

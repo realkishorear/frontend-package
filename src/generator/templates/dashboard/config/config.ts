@@ -1,7 +1,5 @@
 // Config utility for React templates
-// Uses the ConfigProvider from base template
-
-import { useConfig as useBaseConfig } from '../../../config/ConfigProvider'
+// Simple configuration management for dashboard template
 
 export interface AppConfig {
   app: {
@@ -28,39 +26,49 @@ export interface AppConfig {
   }
 }
 
+// Default configuration
+const defaultConfig: AppConfig = {
+  app: {
+    name: 'Dashboard App',
+    version: '1.0.0',
+    theme: 'light',
+    language: 'en'
+  },
+  api: {
+    baseUrl: process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api',
+    timeout: 5000,
+    retries: 3
+  },
+  features: {
+    analytics: true,
+    notifications: true,
+    darkMode: false
+  },
+  ui: {
+    primaryColor: '#3b82f6',
+    secondaryColor: '#8b5cf6',
+    fontSize: '16px',
+    spacing: '8px'
+  }
+}
+
 /**
  * Hook to access configuration
- * Must be used within ConfigProvider
  */
 export function useConfig() {
-  const { get } = useBaseConfig()
   return {
-    get: <T = any>(path: string, defaultValue?: T) => get<T>(path, defaultValue),
-    getApiBaseUrl: () => get<string>('api.baseUrl', 'http://localhost:3000/api'),
-    getConfig: () => ({
-      app: {
-        name: get<string>('app.name', 'Dashboard App'),
-        version: get<string>('app.version', '1.0.0'),
-        theme: get<'light' | 'dark'>('app.theme', 'light'),
-        language: get<string>('app.language', 'en')
-      },
-      api: {
-        baseUrl: get<string>('api.baseUrl', 'http://localhost:3000/api'),
-        timeout: get<number>('api.timeout', 5000),
-        retries: get<number>('api.retries', 3)
-      },
-      features: {
-        analytics: get<boolean>('features.analytics', true),
-        notifications: get<boolean>('features.notifications', true),
-        darkMode: get<boolean>('features.darkMode', false)
-      },
-      ui: {
-        primaryColor: get<string>('ui.primaryColor', '#3b82f6'),
-        secondaryColor: get<string>('ui.secondaryColor', '#8b5cf6'),
-        fontSize: get<string>('ui.fontSize', '16px'),
-        spacing: get<string>('ui.spacing', '8px')
+    get: <T = any>(path: string, defaultValue?: T): T => {
+      // Simple path-based config access
+      const keys = path.split('.')
+      let value: any = defaultConfig
+      for (const key of keys) {
+        value = value?.[key]
+        if (value === undefined) return defaultValue as T
       }
-    })
+      return (value ?? defaultValue) as T
+    },
+    getApiBaseUrl: () => defaultConfig.api.baseUrl,
+    getConfig: (): AppConfig => defaultConfig
   }
 }
 
@@ -69,14 +77,6 @@ export function useConfig() {
  * Can be used outside of React components
  */
 export function getApiBaseUrl(): string {
-  // This will work if ConfigManager is initialized
-  // For use outside components, you may need to import ConfigManager directly
-  try {
-    const { getConfigManager } = require('../../../config/configManager')
-    const configManager = getConfigManager()
-    return configManager.get<string>('api.baseUrl', 'http://localhost:3000/api')
-  } catch {
-    return 'http://localhost:3000/api'
-  }
+  return defaultConfig.api.baseUrl
 }
 

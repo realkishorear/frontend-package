@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from 'oidc-react'
+import { useAuth } from '../services/authService'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -9,7 +9,7 @@ function ProtectedRoute({ children }: ProtectedRouteProps) {
   const auth = useAuth()
   const location = useLocation()
 
-  if (auth.isLoading) {
+  if (auth.loading) {
     // Show loading spinner while checking auth
     return (
       <div className="min-h-screen flex items-center justify-center">

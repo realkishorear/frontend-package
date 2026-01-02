@@ -1,14 +1,13 @@
 // API Service utility that uses config for BASE_URL
 // Example usage for making API calls
 
-import { getConfigManager } from '../../../config/configManager'
+import { getApiBaseUrl as getConfigApiBaseUrl } from '../config/config'
 
 /**
  * Get the API base URL from config
  */
 export function getApiBaseUrl(): string {
-  const configManager = getConfigManager()
-  return configManager.get<string>('api.baseUrl', 'http://localhost:3000/api')
+  return getConfigApiBaseUrl()
 }
 
 /**

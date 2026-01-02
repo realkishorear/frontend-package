@@ -2445,13 +2445,19 @@ export default exampleSlice.reducer;
     // Creates auth service and integrates with Redux if selected
     // ============================================================================
     if (useOIDC) {
-      console.log(chalk.blue('📁 Setting up OIDC/Auth structure...'));
-      
-      // Create services directory for auth
-      const servicesDir = path.join(targetSrcPath, 'services');
-      await fs.ensureDir(servicesDir);
-      
-      // Create auth service
+      // Skip creating oidc-client-ts style auth for dashboard template
+      // Dashboard template already has its own authService.tsx using oidc-react
+      if (template === 'dashboard') {
+        console.log(chalk.blue('📁 Dashboard template already includes OIDC auth setup (oidc-react)...'));
+        console.log(chalk.green('✅ Using dashboard template authService.tsx'));
+      } else {
+        console.log(chalk.blue('📁 Setting up OIDC/Auth structure...'));
+        
+        // Create services directory for auth
+        const servicesDir = path.join(targetSrcPath, 'services');
+        await fs.ensureDir(servicesDir);
+        
+        // Create auth service
       const authServiceContent = `import { UserManager, User, UserManagerSettings } from 'oidc-client-ts';
 
 // OIDC Configuration
@@ -2837,6 +2843,7 @@ export default authSlice.reducer;
           const fileType = routingType === 'v7' ? 'root layout' : 'main.tsx';
           console.log(chalk.green(`✅ Updated ${fileType} with AuthProvider`));
         }
+      }
       }
     }
     

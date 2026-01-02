@@ -161,9 +161,19 @@ export function useAuth(): AuthContextType {
           if (providerConfig && providerConfig.enabled) {
             try {
               const oidcConfig = getOidcConfig(provider)
+              
+              // Validate required fields
+              if (!oidcConfig.authority || !oidcConfig.clientId) {
+                throw new Error(`${providerConfig.name} configuration is incomplete. Missing authority or clientId.`)
+              }
+              
+              // TypeScript type narrowing: after validation, we know these are strings
+              const authority = oidcConfig.authority as string
+              const clientId = oidcConfig.clientId as string
+              
               const userManager = new UserManager({
-                authority: oidcConfig.authority,
-                client_id: oidcConfig.clientId,
+                authority,
+                client_id: clientId,
                 redirect_uri: oidcConfig.redirectUri || window.location.origin,
                 post_logout_redirect_uri: oidcConfig.postLogoutRedirectUri || window.location.origin,
                 response_type: oidcConfig.responseType || 'code',
@@ -229,9 +239,19 @@ export function useAuth(): AuthContextType {
             if (providerConfig && providerConfig.enabled) {
               try {
                 const oidcConfig = getOidcConfig(provider)
+                
+                // Validate required fields
+                if (!oidcConfig.authority || !oidcConfig.clientId) {
+                  throw new Error(`${providerConfig.name} configuration is incomplete. Missing authority or clientId.`)
+                }
+                
+                // TypeScript type narrowing: after validation, we know these are strings
+                const authority = oidcConfig.authority as string
+                const clientId = oidcConfig.clientId as string
+                
                 const userManager = new UserManager({
-                  authority: oidcConfig.authority,
-                  client_id: oidcConfig.clientId,
+                  authority,
+                  client_id: clientId,
                   redirect_uri: oidcConfig.redirectUri || window.location.origin,
                   post_logout_redirect_uri: oidcConfig.postLogoutRedirectUri || window.location.origin,
                   response_type: oidcConfig.responseType || 'code',

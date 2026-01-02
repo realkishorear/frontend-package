@@ -6,13 +6,13 @@ import { useAuth } from '../services/authService'
 
 function Login() {
   const [error, setError] = useState('')
-  const { signInRedirect, isAuthenticated, loading } = useAuth()
+  const { signInRedirect, isAuthenticated, loading, testLogin } = useAuth()
   const navigate = useNavigate()
 
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      navigate('/')
+      navigate('/dashboard')
     }
   }, [isAuthenticated, loading, navigate])
 
@@ -25,6 +25,12 @@ function Login() {
       setError(err.message || 'Failed to initiate login. Please try again.')
       console.error('OIDC login error:', err)
     }
+  }
+
+  const handleTestLogin = () => {
+    setError('')
+    // Use test login to bypass OIDC
+    testLogin()
   }
 
   const handleOAuthLogin = async (provider: 'github' | 'twitter') => {
@@ -68,6 +74,26 @@ function Login() {
           <p className="text-xs mt-1">
             Click the button below to sign in with your identity provider.
           </p>
+        </div>
+
+        {/* Test Login Button - Always available for development */}
+        <Button
+          type="button"
+          onClick={handleTestLogin}
+          className="w-full bg-green-600 hover:bg-green-700 text-white"
+          size="lg"
+        >
+          Test Login (Demo Mode)
+        </Button>
+
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white text-gray-500">Or sign in with OIDC</span>
+          </div>
         </div>
 
         {/* OIDC Login Button */}

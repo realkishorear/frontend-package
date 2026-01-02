@@ -1,9 +1,17 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from 'oidc-react'
+import { ThemeProvider, createTheme } from '@mui/material/styles'
+import CssBaseline from '@mui/material/CssBaseline'
 import { oidcConfig, isOidcConfigured } from './config/oidc.config'
 import Dashboard from './Dashboard'
 import Login from './pages/Login'
 import Register from './pages/Register'
+
+const theme = createTheme({
+  palette: {
+    mode: 'light',
+  },
+})
 
 function App() {
   // Only wrap with AuthProvider if OIDC is properly configured
@@ -22,14 +30,20 @@ function App() {
     </Routes>
   )
 
-  // If OIDC is configured, wrap with AuthProvider
-  if (isOidcConfigured()) {
-    return <AuthProvider {...oidcConfig}>{routes}</AuthProvider>
-  }
+  // Wrap everything with MaterialUI ThemeProvider and CssBaseline
+  const appContent = (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      {/* If OIDC is configured, wrap with AuthProvider */}
+      {isOidcConfigured() ? (
+        <AuthProvider {...oidcConfig}>{routes}</AuthProvider>
+      ) : (
+        routes
+      )}
+    </ThemeProvider>
+  )
 
-  // If OIDC is not configured, render routes without AuthProvider
-  // Components will handle missing auth gracefully
-  return routes
+  return appContent
 }
 
 export default App

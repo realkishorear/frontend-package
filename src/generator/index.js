@@ -1391,6 +1391,16 @@ export async function generateProject(targetPath, answers) {
           // Remove .tsx and .ts extensions from import statements
           mainContent = mainContent.replace(/from\s+['"](\.\/[^'"]+)\.tsx['"]/g, "from '$1'");
           mainContent = mainContent.replace(/from\s+['"](\.\/[^'"]+)\.ts['"]/g, "from '$1'");
+          
+          // For dashboard template, remove ConfigProvider (it doesn't use it)
+          if (template === 'dashboard' && mainContent.includes('ConfigProvider')) {
+            // Remove ConfigProvider import
+            mainContent = mainContent.replace(/import\s+.*ConfigProvider.*from.*['"]\.\/config\/ConfigProvider['"];?\s*\n?/g, '');
+            // Remove ConfigProvider wrapper but keep children
+            mainContent = mainContent.replace(/<ConfigProvider[^>]*>\s*/g, '');
+            mainContent = mainContent.replace(/\s*<\/ConfigProvider>/g, '');
+          }
+          
           await fs.writeFile(mainTsxPath, mainContent, 'utf-8');
         }
       }
@@ -1515,7 +1525,8 @@ export default App
           let templateAppContent = await fs.readFile(templateAppPath, 'utf-8');
           
           // Wrap with MaterialUI ThemeProvider if MaterialUI is selected
-          if (componentLibrary === 'mui') {
+          // Skip if MaterialUI is already set up in the template
+          if (componentLibrary === 'mui' && !templateAppContent.includes('ThemeProvider')) {
             // Check if AuthProvider is already present (dashboard template)
             if (templateAppContent.includes('AuthProvider')) {
               // Add MUI imports after existing imports

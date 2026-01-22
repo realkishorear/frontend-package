@@ -1,7 +1,6 @@
 'use client'
 
-import { AuthProvider } from 'oidc-react'
-import { oidcConfig } from '../config/oidc.config'
+import { AuthProvider } from '../contexts/AuthContext'
 import './globals.css'
 
 export default function RootLayout({
@@ -12,7 +11,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthProvider {...oidcConfig}>
+        <AuthProvider>
           {children}
         </AuthProvider>
       </body>

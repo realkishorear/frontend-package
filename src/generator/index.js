@@ -276,11 +276,10 @@ async function generateNextJSProject(targetPath, answers) {
       },
     };
     
-    // Add react-icons, oidc-react, and oidc-client-ts if dashboard template is selected
+    // Add react-icons and oidc-client-ts if dashboard template is selected
     if (template === 'dashboard') {
       packageJson.dependencies['react-icons'] = '^4.12.0';
-      packageJson.dependencies['oidc-react'] = '^1.3.0';
-      packageJson.dependencies['oidc-client-ts'] = '^3.0.0'; // Needed for provider-specific authentication
+      packageJson.dependencies['oidc-client-ts'] = '^3.0.0'; // React 18-compatible OIDC library
     }
     
     await fs.writeJson(path.join(targetPath, 'package.json'), packageJson, { spaces: 2 });
@@ -2554,9 +2553,9 @@ export default exampleSlice.reducer;
     // ============================================================================
     if (useOIDC) {
       // Skip creating oidc-client-ts style auth for dashboard template
-      // Dashboard template already has its own authService.tsx using oidc-react
+      // Dashboard template already has its own authService.tsx using oidc-client-ts
       if (template === 'dashboard') {
-        console.log(chalk.blue('📁 Dashboard template already includes OIDC auth setup (oidc-react)...'));
+        console.log(chalk.blue('📁 Dashboard template already includes OIDC auth setup (oidc-client-ts)...'));
         console.log(chalk.green('✅ Using dashboard template authService.tsx'));
       } else {
         console.log(chalk.blue('📁 Setting up OIDC/Auth structure...'));

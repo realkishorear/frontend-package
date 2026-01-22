@@ -24,10 +24,10 @@ This template provides a complete OIDC (OpenID Connect) authentication system fo
 
 ### 1. Install Dependencies
 
-The template includes `oidc-react` in the base package.json. Make sure to install it:
+The template includes `oidc-client-ts` in the base package.json. Make sure to install it:
 
 ```bash
-npm install oidc-react
+npm install oidc-client-ts
 ```
 
 ### 2. Configure OIDC Provider
@@ -35,10 +35,10 @@ npm install oidc-react
 Edit `config/oidc.config.ts` with your OIDC provider settings:
 
 ```typescript
-export const oidcConfig: AuthProviderProps = {
+export const oidcConfig: UserManagerSettings = {
   authority: 'https://your-oidc-provider.com',
-  clientId: 'your-client-id',
-  redirectUri: 'http://localhost:3000',
+  client_id: 'your-client-id',
+  redirect_uri: 'http://localhost:3000',
   // ... other settings
 }
 ```
@@ -80,14 +80,13 @@ Create `public/silent-renew.html`:
 The `app/layout.tsx` is already configured with OIDC AuthProvider:
 
 ```tsx
-import { AuthProvider } from 'oidc-react'
-import { oidcConfig } from '../config/oidc.config'
+import { AuthProvider } from '../contexts/AuthContext'
 
 export default function RootLayout({ children }) {
   return (
     <html>
       <body>
-        <AuthProvider {...oidcConfig}>
+        <AuthProvider>
           {children}
         </AuthProvider>
       </body>

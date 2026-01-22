@@ -1,9 +1,18 @@
-import { AuthProviderProps } from 'oidc-react'
+import { UserManagerSettings } from 'oidc-client-ts'
 
 // Extended config interface that includes extraQueryParams for UserManager
-// This extends AuthProviderProps to support extraQueryParams which is used with UserManager
-export interface ExtendedOidcConfig extends AuthProviderProps {
+export interface ExtendedOidcConfig extends UserManagerSettings {
   extraQueryParams?: Record<string, string>
+  // Legacy camelCase properties for backward compatibility
+  authority?: string
+  clientId?: string
+  redirectUri?: string
+  postLogoutRedirectUri?: string
+  responseType?: string
+  scope?: string
+  silentRedirectUri?: string
+  onSignIn?: () => void
+  onSignOut?: () => void
 }
 
 /**
@@ -164,13 +173,19 @@ const createOidcConfig = (providerConfig: ProviderConfig, provider?: OidcProvide
   
   const config: ExtendedOidcConfig = {
     authority: providerConfig.authority || 'https://placeholder-oidc-provider.com',
+    client_id: providerConfig.clientId || 'placeholder-client-id',
+    redirect_uri: baseRedirectUri,
+    post_logout_redirect_uri: getEnvVar('REACT_APP_OIDC_POST_LOGOUT_REDIRECT_URI', window.location.origin),
+    response_type: 'code',
+    scope: getEnvVar('REACT_APP_OIDC_SCOPE', 'openid profile email'),
+    automaticSilentRenew: true,
+    loadUserInfo: true,
+    silent_redirect_uri: getEnvVar('REACT_APP_OIDC_SILENT_REDIRECT_URI', `${window.location.origin}/silent-renew.html`),
+    // Legacy camelCase properties for backward compatibility
     clientId: providerConfig.clientId || 'placeholder-client-id',
     redirectUri: baseRedirectUri,
     postLogoutRedirectUri: getEnvVar('REACT_APP_OIDC_POST_LOGOUT_REDIRECT_URI', window.location.origin),
     responseType: 'code',
-    scope: getEnvVar('REACT_APP_OIDC_SCOPE', 'openid profile email'),
-    automaticSilentRenew: true,
-    loadUserInfo: true,
     silentRedirectUri: getEnvVar('REACT_APP_OIDC_SILENT_REDIRECT_URI', `${window.location.origin}/silent-renew.html`),
     onSignIn: () => {
       console.log(`User signed in successfully with ${providerConfig.name}`)
@@ -181,7 +196,6 @@ const createOidcConfig = (providerConfig: ProviderConfig, provider?: OidcProvide
   }
   
   // For Auth0 with Facebook connection, add connection parameter
-  // Note: extraQueryParams is only used with UserManager, not AuthProvider
   if (provider === 'facebook' && providerConfig.connection && providerConfig.authority.includes('auth0.com')) {
     // Auth0 requires connection parameter in extraQueryParams for UserManager
     config.extraQueryParams = {
@@ -199,8 +213,7 @@ export const isOidcConfigured = (): boolean => {
 }
 
 // Default OIDC config (for backward compatibility)
-// Note: AuthProvider only uses AuthProviderProps properties, extraQueryParams is ignored
-export const oidcConfig: AuthProviderProps = getOidcConfig('default')
+export const oidcConfig: ExtendedOidcConfig = getOidcConfig('default')
 
 /**
  * ENVIRONMENT VARIABLES SETUP
@@ -263,6 +276,6 @@ export const oidcConfig: AuthProviderProps = getOidcConfig('default')
  *    - Use the single provider configuration (REACT_APP_OIDC_AUTHORITY and REACT_APP_OIDC_CLIENT_ID)
  *    - Or configure as a custom provider by modifying this file
  * 
- * For more details, see: https://github.com/bjerkio/oidc-react
+ * For more details, see: https://github.com/authts/oidc-client-ts
  */
 

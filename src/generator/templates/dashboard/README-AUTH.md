@@ -24,21 +24,21 @@ This template provides a complete OIDC (OpenID Connect) authentication system fo
 
 ### 1. Install Dependencies
 
-The template includes `oidc-react` in the base package.json. Make sure to install it:
+The template includes `oidc-client-ts` in the base package.json. Make sure to install it:
 
 ```bash
-npm install oidc-react
+npm install oidc-client-ts
 ```
 
 ### 2. Configure OIDC Provider
 
-Edit `config/oidc.config.ts` with your OIDC provider settings:
+Edit `config/oidc.config.ts` with your OIDC provider settings. The config uses `UserManagerSettings` from `oidc-client-ts`:
 
 ```typescript
-export const oidcConfig: AuthProviderProps = {
+export const oidcConfig: ExtendedOidcConfig = {
   authority: 'https://your-oidc-provider.com',
-  clientId: 'your-client-id',
-  redirectUri: 'http://localhost:5173',
+  client_id: 'your-client-id',
+  redirect_uri: 'http://localhost:5173',
   // ... other settings
 }
 ```
@@ -66,12 +66,11 @@ The `silent-renew.html` file is already included in `public/silent-renew.html`. 
 The `App.tsx` is already configured with OIDC AuthProvider:
 
 ```tsx
-import { AuthProvider } from 'oidc-react'
-import { oidcConfig } from './config/oidc.config'
+import { AuthProvider } from './services/authService'
 
 function App() {
   return (
-    <AuthProvider {...oidcConfig}>
+    <AuthProvider>
       {/* Your routes */}
     </AuthProvider>
   )
@@ -171,6 +170,6 @@ Make sure all redirect URIs:
 ### Build Issues
 
 If you get import errors:
-1. Make sure `oidc-react` is installed: `npm install oidc-react`
+1. Make sure `oidc-client-ts` is installed: `npm install oidc-client-ts`
 2. Check that TypeScript can resolve the module
 3. Verify the package is in your `package.json` dependencies

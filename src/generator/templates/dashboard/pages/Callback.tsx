@@ -6,7 +6,7 @@ import { useAuth } from '../services/authService'
  * OIDC Callback Page
  * 
  * This page handles the OIDC redirect callback.
- * With oidc-react, the AuthProvider typically handles callbacks automatically,
+ * The AuthProvider from authService handles callbacks automatically using oidc-client-ts,
  * but this page can be used for additional handling or user feedback.
  */
 export default function Callback() {

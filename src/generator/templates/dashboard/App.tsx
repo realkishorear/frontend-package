@@ -1,12 +1,10 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { AuthProvider } from 'oidc-react'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
-import { oidcConfig, isOidcConfigured } from './config/oidc.config'
 import Dashboard from './Dashboard'
 import Login from './pages/Login'
 import Register from './pages/Register'
-import { useAuth } from './services/authService'
+import { AuthProvider, useAuth } from './services/authService'
 
 const theme = createTheme({
   palette: {
@@ -80,16 +78,13 @@ function App() {
     </Routes>
   )
 
-  // Wrap everything with MaterialUI ThemeProvider and CssBaseline
+  // Wrap everything with MaterialUI ThemeProvider, CssBaseline, and AuthProvider
   const appContent = (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {/* If OIDC is configured, wrap with AuthProvider */}
-      {isOidcConfigured() ? (
-        <AuthProvider {...oidcConfig}>{routes}</AuthProvider>
-      ) : (
-        routes
-      )}
+      <AuthProvider>
+        {routes}
+      </AuthProvider>
     </ThemeProvider>
   )
 

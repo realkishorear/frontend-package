@@ -73,8 +73,11 @@ export async function askQuestions(): Promise<ProjectAnswers> {
       };
 
       const bundlerAnswer = await inquirer.prompt([bundlerQuestion]);
-      answers.bundler = bundlerAnswer.bundler;
-      answers.frameworkValue = bundlerAnswer.bundler; // e.g., "react-vite"
+      // Extract just the bundler part (e.g., "react-vite" -> "vite")
+      const bundlerValue = bundlerAnswer.bundler; // e.g., "react-vite" or "react-webpack"
+      const bundlerParts = bundlerValue.split('-');
+      answers.bundler = bundlerParts[bundlerParts.length - 1] as 'vite' | 'webpack'; // Extract "vite" or "webpack"
+      answers.frameworkValue = bundlerValue; // Keep full value for framework identification
     } else if (answers.framework === 'nextjs') {
       answers.frameworkValue = 'nextjs';
     }

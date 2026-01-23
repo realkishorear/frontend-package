@@ -5,6 +5,7 @@ import { execa } from 'execa';
 import chalk from 'chalk';
 import { installDependencies } from '../utils/packageManager.js';
 import { logger } from '../utils/logger.js';
+import { executeCommands } from './commandExecutor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1282,68 +1283,13 @@ export class AppRoutingModule { }`;
   }
 }
 
-export async function generateProject(targetPath, answers) {
-  // Map new answer structure to generator expectations
-  const { framework, cssFramework: cssFrameworkRaw, componentLibrary: componentLibraryRaw, bundler, stateManagement, auth: authRaw, template: templateRaw } = answers;
+export async function generateProject(targetPath, answers, projectName) {
+  // Extract project name from targetPath if not provided
+  const finalProjectName = projectName || path.basename(targetPath);
   
-  // Route to appropriate generator based on framework
-  if (framework === 'nextjs') {
-    return await generateNextJSProject(targetPath, answers);
-  }
-  
-  if (framework === 'angular') {
-    return await generateAngularProject(targetPath, answers);
-  }
-  
-  // React project generation (existing code)
-  
-  // Map template: 'none' -> 'empty'
-  const template = templateRaw === 'none' ? 'empty' : templateRaw;
-  
-  // Map CSS framework: 'scss' -> 'sass' (generator uses 'sass')
-  const cssFramework = cssFrameworkRaw === 'scss' ? 'sass' : cssFrameworkRaw;
-  
-  // Map component library: 'plain' -> 'none'
-  const componentLibrary = componentLibraryRaw === 'plain' ? 'none' : componentLibraryRaw;
-  
-  // Map state management: 'redux' -> useRedux boolean
-  const useRedux = stateManagement === 'redux';
-  
-  // Map auth: 'oidc' -> useOIDC boolean
-  const useOIDC = authRaw === 'oidc';
-  
-  // Set defaults for removed features
-  const useReactQuery = false;
-  const useLogger = false;
-  const useAnimation = false;
-  const routingType = 'v6'; // Default to v6, no longer asking user
-  
-  // Ensure bundler is set for React
-  if (!bundler) {
-    throw new Error('Bundler is required for React projects');
-  }
-  
-  // Dashboard template uses Tailwind utility classes
-  // Show warning but allow user's CSS framework choice
-  if (template === 'dashboard' && cssFramework !== 'tailwind') {
-    console.log(chalk.yellow(`\n⚠️  Warning: Dashboard template uses Tailwind utility classes.`));
-    console.log(chalk.yellow(`   You've selected ${cssFramework.toUpperCase()}, so you'll need to replace Tailwind classes with your own styling.`));
-    console.log(chalk.yellow(`   Proceeding with ${cssFramework.toUpperCase()} as requested...\n`));
-  }
-
-  try {
-    // Get paths
-    const basePath = path.join(__dirname, 'base');
-    const templatePath = path.join(__dirname, 'templates', template);
-
-    // Create target directory
-    await fs.ensureDir(targetPath);
-
-    console.log(chalk.blue('📁 Copying base files...'));
-    
-    // Copy base files (package.json, etc.)
-    // Note: bundler config files and tsconfig will be created separately based on bundler choice
-    const baseFiles = [
+  // Execute commands from JSON configuration
+  await executeCommands(targetPath, answers, finalProjectName);
+}
       'package.json',
       'index.html',
       'tailwind.config.js',
@@ -3655,13 +3601,3 @@ export const scaleIn = {
           console.log(chalk.red('   ✗ framer-motion missing from package.json'));
         }
         if (!animationHookExists) {
-          console.log(chalk.red('   ✗ hooks/useAnimation.ts file not found'));
-        }
-      }
-    }
-
-  } catch (error) {
-    console.error(chalk.red(`❌ Error generating project: ${error.message}`));
-    throw error;
-  }
-}

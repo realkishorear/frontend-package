@@ -53,6 +53,7 @@ for (const dir of generatorDirs) {
 const generatorFiles = [
   'commandBuilder.js',
   'questionBuilder.js',
+  'commandExecutor.js',
   'commands.config.json'
 ];
 

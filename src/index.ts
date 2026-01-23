@@ -35,39 +35,8 @@ export async function initProject(projectName: string): Promise<void> {
     // Validate target path (after questions, before generation)
     await validateTargetPath(targetPath, projectName);
 
-    // Show summary of selections
-    console.log(chalk.cyan.bold('\n📋 Project Configuration Summary:\n'));
-    console.log(chalk.white(`   Framework: ${chalk.cyan(answers.framework)}`));
-    console.log(chalk.white(`   CSS Framework: ${chalk.cyan(answers.cssFramework)}`));
-    console.log(chalk.white(`   Component Library: ${chalk.cyan(answers.componentLibrary)}`));
-    if (answers.bundler) {
-      console.log(chalk.white(`   Bundler: ${chalk.cyan(answers.bundler)}`));
-    }
-    console.log(chalk.white(`   State Management: ${chalk.cyan(answers.stateManagement)}`));
-    if (answers.auth) {
-      console.log(chalk.white(`   Auth: ${chalk.cyan(answers.auth)}`));
-    }
-    console.log(chalk.white(`   Template: ${chalk.cyan(answers.template)}`));
-    console.log(chalk.white(`\n   Target: ${chalk.cyan(targetPath)}\n`));
-
-    logger.info('📁 Generating project...\n');
-
-    // Generate the project
-    await generateProject(targetPath, answers);
-
-    logger.success('Project created successfully!\n');
-    logger.info('📝 Next steps:');
-    if (projectName !== '.') {
-      console.log(chalk.white(`   cd ${projectName}`));
-    }
-
-    // Add Shadcn setup instruction if selected
-    if (answers.componentLibrary === 'shadcn') {
-      console.log(chalk.cyan('   npx shadcn-ui@latest init'));
-    }
-
-    console.log(chalk.white('   npm run dev'));
-    console.log(chalk.white('\n🎉 Happy coding!\n'));
+    // Generate the project using command executor
+    await generateProject(targetPath, answers, projectName);
   } catch (error) {
     if (error instanceof ProjectGenerationError) {
       logger.error(error.message);

@@ -1,228 +1,188 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import type { ProjectAnswers } from './types/index.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/**
+ * Loads the commands configuration
+ */
+function loadConfig() {
+  const configPath = path.join(__dirname, 'generator', 'commands.config.json');
+  const configContent = fs.readFileSync(configPath, 'utf-8');
+  return JSON.parse(configContent);
+}
 
 /**
  * Interactive prompts to gather project configuration from the user
- * Strictly follows prompt1.md requirements
+ * Now JSON-driven - questions are generated from commands.config.json
  * @returns Project configuration answers
  */
 export async function askQuestions(): Promise<ProjectAnswers> {
   try {
+    const config = await loadConfig();
+    const answers: any = {};
+
     // Question 1: Framework
-    const frameworkAnswer = await inquirer.prompt<{ framework: ProjectAnswers['framework'] }>([
-      {
-        type: 'list',
-        name: 'framework',
-        message: chalk.cyan.bold('\nWhich framework you want to use to build the project:'),
-        choices: [
-          { name: '⚛️  React', value: 'react' },
-          { name: '🅰️  Angular', value: 'angular' },
-          { name: '▲ Next.js', value: 'nextjs' },
-        ],
-      },
-    ]);
-
-    // Handle Next.js flow: Template -> OIDC
-    if (frameworkAnswer.framework === 'nextjs') {
-      // Question 1: Template
-      const templateAnswer = await inquirer.prompt<{ template: ProjectAnswers['template'] }>([
-        {
-          type: 'list',
-          name: 'template',
-          message: chalk.cyan.bold('\nWhat template the user want:'),
-          choices: [
-            { name: '📊 Dashboard', value: 'dashboard' },
-            { name: '📝 Plain (Just hello world in center of page)', value: 'none' },
-          ],
-        },
-      ]);
-
-      // Question 2: OIDC
-      const oidcAnswer = await inquirer.prompt<{ needsOIDC: boolean }>([
-        {
-          type: 'confirm',
-          name: 'needsOIDC',
-          message: chalk.cyan.bold('\nDo user need OIDC integration?'),
-          default: false,
-        },
-      ]);
-
-      // Return answers for Next.js
-      return {
-        ...frameworkAnswer,
-        cssFramework: 'tailwind', // Default for Next.js
-        componentLibrary: 'plain', // Default for Next.js
-        stateManagement: 'plain', // Default for Next.js
-        auth: oidcAnswer.needsOIDC ? 'oidc' : 'none',
-        ...templateAnswer,
-      };
-    }
-
-    // Handle Angular flow (Don't change as of now - keep existing behavior)
-    if (frameworkAnswer.framework === 'angular') {
-      // Question 2: CSS Library (Angular supports SCSS)
-      const cssChoices: Array<{ name: string; value: ProjectAnswers['cssFramework']; short: string }> = [
-        { name: '🎨 TailwindCSS', value: 'tailwind', short: 'TailwindCSS' },
-        { name: '📦 Scss', value: 'scss', short: 'Scss' },
-        { name: '💅 CSS', value: 'css', short: 'CSS' },
-      ];
-
-      const cssAnswer = await inquirer.prompt<{ cssFramework: ProjectAnswers['cssFramework'] }>([
-        {
-          type: 'list',
-          name: 'cssFramework',
-          message: chalk.cyan.bold('\nWhich CSS library user want to use:'),
-          choices: cssChoices,
-        },
-      ]);
-
-      // Question 3: Component Library (Angular)
-      const componentChoices: Array<{ name: string; value: ProjectAnswers['componentLibrary']; short: string }> = [
-        { name: '📦 Material UI', value: 'mui', short: 'Material UI' },
-        { name: '📝 Plain', value: 'plain', short: 'Plain' },
-      ];
-
-      const componentAnswer = await inquirer.prompt<{ componentLibrary: ProjectAnswers['componentLibrary'] }>([
-        {
-          type: 'list',
-          name: 'componentLibrary',
-          message: chalk.cyan.bold('\nWhich component library user want to use:'),
-          choices: componentChoices,
-        },
-      ]);
-
-      // Question 4: State Management
-      const stateManagementAnswer = await inquirer.prompt<{ stateManagement: ProjectAnswers['stateManagement'] }>([
-        {
-          type: 'list',
-          name: 'stateManagement',
-          message: chalk.cyan.bold('\nDo you want to use state management:'),
-          choices: [
-            { name: '🔄 Redux', value: 'redux' },
-            { name: '📝 Plain', value: 'plain' },
-          ],
-        },
-      ]);
-
-      // Question 5: Template
-      const templateAnswer = await inquirer.prompt<{ template: ProjectAnswers['template'] }>([
-        {
-          type: 'list',
-          name: 'template',
-          message: chalk.cyan.bold('\nDo you want any Template:'),
-          choices: [
-            { name: '📊 Dashboard', value: 'dashboard' },
-            { name: '❌ No Templates', value: 'none' },
-          ],
-        },
-      ]);
-
-      return {
-        ...frameworkAnswer,
-        ...cssAnswer,
-        ...componentAnswer,
-        stateManagement: stateManagementAnswer.stateManagement,
-        auth: 'none', // Angular doesn't have OIDC option in prompt1.md
-        ...templateAnswer,
-      };
-    }
-
-    // Handle React flow: Bundler -> CSS -> Component Library (filtered by CSS) -> Redux -> OIDC -> Template
-    // Question 1: Bundler
-    const bundlerAnswer = await inquirer.prompt<{ bundler: ProjectAnswers['bundler'] }>([
-      {
-        type: 'list',
-        name: 'bundler',
-        message: chalk.cyan.bold('\nWhich bundler user want to use:'),
-        choices: [
-          { name: '📦 WebPack', value: 'webpack' },
-          { name: '⚡ Vite', value: 'vite' },
-        ],
-      },
-    ]);
-
-    // Question 2: CSS Library
-    const cssAnswer = await inquirer.prompt<{ cssFramework: ProjectAnswers['cssFramework'] }>([
-      {
-        type: 'list',
-        name: 'cssFramework',
-        message: chalk.cyan.bold('\nWhich CSS library user want to use:'),
-        choices: [
-          { name: '🎨 TailwindCSS', value: 'tailwind' },
-          { name: '💅 CSS', value: 'css' },
-        ],
-      },
-    ]);
-
-    // Question 3: Component Library (filtered based on CSS library)
-    // ShadCN only applicable with TailwindCSS
-    const componentChoices: Array<{ name: string; value: ProjectAnswers['componentLibrary']; short: string }> = [];
-    
-    if (cssAnswer.cssFramework === 'tailwind') {
-      // ShadCN is only applicable with TailwindCSS
-      componentChoices.push({ name: '🎨 ShadCN', value: 'shadcn', short: 'ShadCN' });
-    }
-    
-    // MaterialUI and AntDesign are applicable with both
-    componentChoices.push({ name: '📦 MaterialUI', value: 'mui', short: 'MaterialUI' });
-    componentChoices.push({ name: '🔷 AntDesign', value: 'antd', short: 'AntDesign' });
-    componentChoices.push({ name: '📝 Plain', value: 'plain', short: 'Plain' });
-
-    const componentAnswer = await inquirer.prompt<{ componentLibrary: ProjectAnswers['componentLibrary'] }>([
-      {
-        type: 'list',
-        name: 'componentLibrary',
-        message: chalk.cyan.bold('\nWhich component library user want to use:'),
-        choices: componentChoices,
-      },
-    ]);
-
-    // Question 4: Redux (Yes/No)
-    const reduxAnswer = await inquirer.prompt<{ needsRedux: boolean }>([
-      {
-        type: 'confirm',
-        name: 'needsRedux',
-        message: chalk.cyan.bold('\nDo user need Redux?'),
-        default: false,
-      },
-    ]);
-
-    // Question 5: OIDC (Yes/No)
-    const oidcAnswer = await inquirer.prompt<{ needsOIDC: boolean }>([
-      {
-        type: 'confirm',
-        name: 'needsOIDC',
-        message: chalk.cyan.bold('\nDo user need OIDC integration?'),
-        default: false,
-      },
-    ]);
-
-    // Question 6: Template
-    const templateAnswer = await inquirer.prompt<{ template: ProjectAnswers['template'] }>([
-      {
-        type: 'list',
-        name: 'template',
-        message: chalk.cyan.bold('\nWhat template the user want:'),
-        choices: [
-          { name: '📊 Dashboard', value: 'dashboard' },
-          { name: '📝 Plain', value: 'none' },
-        ],
-      },
-    ]);
-
-    // Combine all answers for React
-    const answers: ProjectAnswers = {
-      ...frameworkAnswer,
-      ...bundlerAnswer,
-      ...cssAnswer,
-      ...componentAnswer,
-      stateManagement: reduxAnswer.needsRedux ? 'redux' : 'plain',
-      auth: oidcAnswer.needsOIDC ? 'oidc' : 'none',
-      ...templateAnswer,
+    const frameworkQuestion = {
+      type: 'list',
+      name: 'framework',
+      message: chalk.cyan.bold(`\n${config.questions.framework.message}`),
+      choices: Object.values(config.frameworks).map((fw: any) => ({
+        name: fw.label,
+        value: fw.value,
+        short: fw.label
+      }))
     };
 
-    return answers;
+    const frameworkAnswer = await inquirer.prompt([frameworkQuestion]);
+    answers.framework = frameworkAnswer.framework;
+
+    const frameworkConfig = config.frameworks[answers.framework];
+
+    // Question 2: Bundler (if framework requires it)
+    if (frameworkConfig && frameworkConfig.requiresBundler) {
+      const bundlerQuestion = {
+        type: 'list',
+        name: 'bundler',
+        message: chalk.cyan.bold(`\n${config.questions.bundler.message}`),
+        choices: Object.values(frameworkConfig.bundlers).map((b: any) => ({
+          name: b.label,
+          value: b.value,
+          short: b.label
+        }))
+      };
+
+      const bundlerAnswer = await inquirer.prompt([bundlerQuestion]);
+      answers.bundler = bundlerAnswer.bundler;
+      answers.frameworkValue = bundlerAnswer.bundler; // e.g., "react-vite"
+    } else if (answers.framework === 'nextjs') {
+      answers.frameworkValue = 'nextjs';
+    }
+
+    // Determine the effective framework value for filtering
+    const effectiveFramework = answers.frameworkValue || answers.framework;
+
+    // Question 3: CSS Library
+    const cssChoices = Object.values(config.css)
+      .filter((cssOption: any) => {
+        // Filter based on requirements
+        if (cssOption.requires && cssOption.requires.length > 0) {
+          return cssOption.requires.every((req: any) => {
+            if (req.framework) {
+              return req.framework.includes(effectiveFramework) || 
+                     req.framework.includes(answers.framework);
+            }
+            return true;
+          });
+        }
+        return true;
+      })
+      .map((cssOption: any) => ({
+        name: cssOption.label,
+        value: cssOption.value,
+        short: cssOption.label
+      }));
+
+    const cssAnswer = await inquirer.prompt([{
+      type: 'list',
+      name: 'css',
+      message: chalk.cyan.bold(`\n${config.questions.css.message}`),
+      choices: cssChoices
+    }]);
+    answers.css = cssAnswer.css;
+    answers.cssFramework = cssAnswer.css; // For backward compatibility
+
+    // Question 4: Component Library (filtered based on CSS and framework)
+    const componentChoices = Object.values(config.components)
+      .filter((compOption: any) => {
+        // Filter based on requirements
+        if (compOption.requires && compOption.requires.length > 0) {
+          return compOption.requires.every((req: any) => {
+            if (req.css) {
+              return req.css.includes(answers.css);
+            }
+            if (req.framework) {
+              const frameworkMatch = req.framework.includes(effectiveFramework) || 
+                                     req.framework.includes(answers.framework);
+              return frameworkMatch;
+            }
+            return true;
+          });
+        }
+        return true;
+      })
+      .map((compOption: any) => ({
+        name: compOption.label,
+        value: compOption.value,
+        short: compOption.label
+      }));
+
+    const componentAnswer = await inquirer.prompt([{
+      type: 'list',
+      name: 'components',
+      message: chalk.cyan.bold(`\n${config.questions.components.message}`),
+      choices: componentChoices
+    }]);
+    answers.components = componentAnswer.components;
+    answers.componentLibrary = componentAnswer.components; // For backward compatibility
+
+    // Question 5: State Management (only for React/Next.js)
+    let stateManagement = 'plain';
+    if (answers.framework === 'react' || answers.framework === 'nextjs') {
+      const stateQuestion = {
+        type: 'confirm',
+        name: 'needsRedux',
+        message: chalk.cyan.bold(`\n${config.questions.state.message}`),
+        default: false
+      };
+
+      const stateAnswer = await inquirer.prompt([stateQuestion]);
+      stateManagement = stateAnswer.needsRedux ? 'redux' : 'plain';
+    }
+    answers.stateManagement = stateManagement;
+    answers.state = stateManagement === 'redux' ? 'redux' : 'plain';
+
+    // Question 6: OIDC (Yes/No)
+    const authQuestion = {
+      type: 'confirm',
+      name: 'needsOIDC',
+      message: chalk.cyan.bold(`\n${config.questions.auth.message}`),
+      default: false
+    };
+
+    const authAnswer = await inquirer.prompt([authQuestion]);
+    answers.auth = authAnswer.needsOIDC ? 'oidc' : 'none';
+
+    // Question 7: Template
+    const templateChoices = Object.values(config.templates).map((t: any) => ({
+      name: t.label,
+      value: t.value,
+      short: t.label
+    }));
+
+    const templateAnswer = await inquirer.prompt([{
+      type: 'list',
+      name: 'template',
+      message: chalk.cyan.bold(`\n${config.questions.template.message}`),
+      choices: templateChoices
+    }]);
+    answers.template = templateAnswer.template;
+
+    // Return normalized answers matching ProjectAnswers type
+    return {
+      framework: answers.framework,
+      bundler: answers.bundler,
+      cssFramework: answers.cssFramework || answers.css,
+      componentLibrary: answers.componentLibrary || answers.components,
+      stateManagement: answers.stateManagement,
+      auth: answers.auth,
+      template: answers.template
+    } as ProjectAnswers;
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(`Failed to collect user input: ${error.message}`);
@@ -230,4 +190,3 @@ export async function askQuestions(): Promise<ProjectAnswers> {
     throw error;
   }
 }
-

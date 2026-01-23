@@ -1,26 +1,93 @@
 {
+  "questions": {
+    "framework": {
+      "message": "Which framework you want to use to build the project:",
+      "type": "list"
+    },
+    "bundler": {
+      "message": "Which bundler user want to use:",
+      "type": "list",
+      "conditional": {
+        "showIf": {
+          "framework": ["react", "angular"]
+        }
+      }
+    },
+    "css": {
+      "message": "Which CSS library user want to use:",
+      "type": "list"
+    },
+    "components": {
+      "message": "Which component library user want to use:",
+      "type": "list"
+    },
+    "state": {
+      "message": "Do user need Redux?",
+      "type": "confirm",
+      "default": false,
+      "conditional": {
+        "showIf": {
+          "framework": ["react", "nextjs"]
+        }
+      }
+    },
+    "auth": {
+      "message": "Do user need OIDC integration?",
+      "type": "confirm",
+      "default": false
+    },
+    "template": {
+      "message": "What template the user want:",
+      "type": "list"
+    }
+  },
   "frameworks": {
-    "react-vite": {
-      "command": "npm create vite@latest my-app -- --template react",
-      "requires": [],
-      "conflicts": []
+    "react": {
+      "label": "⚛️  React",
+      "value": "react",
+      "requiresBundler": true,
+      "bundlers": {
+        "vite": {
+          "label": "⚡ Vite",
+          "value": "react-vite",
+          "command": "npm create vite@latest my-app -- --template react",
+          "requires": [],
+          "conflicts": []
+        },
+        "webpack": {
+          "label": "📦 WebPack",
+          "value": "react-webpack",
+          "command": "npx create-react-app my-app",
+          "requires": [],
+          "conflicts": []
+        }
+      }
     },
-    "react-webpack": {
-      "command": "npx create-react-app my-app",
-      "requires": [],
-      "conflicts": []
-    },
-    "angular-vite": {
-      "command": "npm create vite@latest my-app -- --template angular",
-      "requires": [],
-      "conflicts": []
-    },
-    "angular-webpack": {
-      "command": "ng new my-app",
-      "requires": [],
-      "conflicts": []
+    "angular": {
+      "label": "🅰️  Angular",
+      "value": "angular",
+      "requiresBundler": true,
+      "bundlers": {
+        "vite": {
+          "label": "⚡ Vite",
+          "value": "angular-vite",
+          "command": "npm create vite@latest my-app -- --template angular",
+          "requires": [],
+          "conflicts": []
+        },
+        "webpack": {
+          "label": "📦 WebPack",
+          "value": "angular-webpack",
+          "command": "ng new my-app",
+          "requires": [],
+          "conflicts": []
+        }
+      }
     },
     "nextjs": {
+      "label": "▲ Next.js",
+      "value": "nextjs",
+      "requiresBundler": false,
       "command": "npx create-next-app@latest my-app",
       "requires": [],
       "conflicts": []
@@ -28,6 +95,8 @@
   },
   "css": {
     "tailwind": {
+      "label": "🎨 TailwindCSS",
+      "value": "tailwind",
       "commands": [
         "npm install -D tailwindcss postcss autoprefixer",
         "npx tailwindcss init -p"
@@ -36,13 +105,28 @@
       "conflicts": []
     },
     "css": {
+      "label": "💅 CSS",
+      "value": "css",
       "commands": [],
       "requires": [],
+      "conflicts": []
+    },
+    "scss": {
+      "label": "📦 Scss",
+      "value": "scss",
+      "commands": [],
+      "requires": [
+        {
+          "framework": ["angular"]
+        }
+      ],
       "conflicts": []
     }
   },
   "components": {
     "mui": {
+      "label": "📦 Material UI",
+      "value": "mui",
       "commands": [
         "npm install @mui/material @emotion/react @emotion/styled"
       ],
@@ -50,6 +134,8 @@
       "conflicts": []
     },
     "shadcn": {
+      "label": "🎨 ShadCN",
+      "value": "shadcn",
       "commands": [
         "npx shadcn@latest init"
       ],
@@ -58,12 +144,14 @@
           "css": ["tailwind"]
         },
         {
-          "framework": ["react-vite", "react-webpack", "nextjs"]
+          "framework": ["react", "nextjs"]
         }
       ],
       "conflicts": []
     },
     "antd": {
+      "label": "🔷 AntDesign",
+      "value": "antd",
       "commands": [
         "npm install antd"
       ],
@@ -71,6 +159,8 @@
       "conflicts": []
     },
     "plain": {
+      "label": "📝 Plain",
+      "value": "plain",
       "commands": [],
       "requires": [],
       "conflicts": []
@@ -78,24 +168,52 @@
   },
   "state": {
     "redux": {
+      "label": "🔄 Redux",
+      "value": "redux",
       "commands": [
         "npm install @reduxjs/toolkit react-redux"
       ],
       "requires": [
         {
-          "framework": ["react-vite", "react-webpack", "nextjs"]
+          "framework": ["react", "nextjs"]
         }
       ],
+      "conflicts": []
+    },
+    "plain": {
+      "label": "📝 Plain",
+      "value": "plain",
+      "commands": [],
+      "requires": [],
       "conflicts": []
     }
   },
   "auth": {
     "oidc": {
+      "label": "🔐 OIDC",
+      "value": "oidc",
       "commands": [
         "npm install @react-oauth/google @azure/msal-react @azure/msal-browser react-facebook-login"
       ],
       "requires": [],
       "conflicts": []
+    },
+    "none": {
+      "label": "❌ None",
+      "value": "none",
+      "commands": [],
+      "requires": [],
+      "conflicts": []
+    }
+  },
+  "templates": {
+    "dashboard": {
+      "label": "📊 Dashboard",
+      "value": "dashboard"
+    },
+    "none": {
+      "label": "📝 Plain",
+      "value": "none"
     }
   }
 }

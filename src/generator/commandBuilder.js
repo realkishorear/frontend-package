@@ -24,29 +24,42 @@ function loadConfig() {
 function validateRequirement(requirement, answers) {
   for (const [key, value] of Object.entries(requirement)) {
     if (key === 'framework') {
-      if (!value.includes(answers.framework)) {
+      const frameworkValue = answers.frameworkValue || answers.framework;
+      // Check if framework value matches (e.g., "react-vite" or just "react")
+      const matches = value.some(v => {
+        // Check exact match
+        if (v === frameworkValue || v === answers.framework) return true;
+        // Check if framework value starts with the requirement (e.g., "react-vite" starts with "react")
+        if (frameworkValue && frameworkValue.startsWith(v + '-')) return true;
+        if (answers.framework === v) return true;
+        return false;
+      });
+      if (!matches) {
         return false;
       }
     } else if (key === 'css') {
-      if (!value.includes(answers.css)) {
+      const cssValue = answers.css || answers.cssFramework;
+      if (!value.includes(cssValue)) {
         return false;
       }
     } else if (key === 'components') {
-      if (!value.includes(answers.components)) {
+      const componentsValue = answers.components || answers.componentLibrary;
+      if (!value.includes(componentsValue)) {
         return false;
       }
     } else if (key === 'state') {
-      if (answers.state && !value.includes(answers.state)) {
+      const stateValue = answers.state || answers.stateManagement;
+      if (stateValue && stateValue !== 'plain' && !value.includes(stateValue)) {
         return false;
       }
-      if (!answers.state && value.length > 0) {
+      if ((!stateValue || stateValue === 'plain') && value.length > 0) {
         return false;
       }
     } else if (key === 'auth') {
-      if (answers.auth && !value.includes(answers.auth)) {
+      if (answers.auth && answers.auth !== 'none' && !value.includes(answers.auth)) {
         return false;
       }
-      if (!answers.auth && value.length > 0) {
+      if ((!answers.auth || answers.auth === 'none') && value.length > 0) {
         return false;
       }
     }
@@ -163,12 +176,36 @@ export function buildCommands(config = null, answers) {
   const commands = [];
 
   // 1. Framework command (always first)
-  const frameworkConfig = commandsConfig.frameworks[answers.framework];
-  if (!frameworkConfig) {
-    throw new Error(`Invalid framework: ${answers.framework}`);
+  // Handle new structure where framework can have bundlers
+  let frameworkConfig = null;
+  let frameworkValue = answers.frameworkValue || answers.framework;
+  
+  // Check if framework has bundlers (React/Angular structure)
+  const frameworkBase = commandsConfig.frameworks[answers.framework];
+  if (frameworkBase && frameworkBase.bundlers) {
+    // Framework requires bundler selection - find the bundler config
+    for (const [bundlerKey, bundlerConfig] of Object.entries(frameworkBase.bundlers)) {
+      if (bundlerConfig.value === frameworkValue) {
+        frameworkConfig = bundlerConfig;
+        break;
+      }
+    }
+  } else if (frameworkBase) {
+    // Direct framework (Next.js)
+    frameworkConfig = frameworkBase;
   }
 
-  if (isFeatureValid(frameworkConfig, answers)) {
+  if (!frameworkConfig) {
+    throw new Error(`Invalid framework: ${answers.framework}${frameworkValue ? ` with bundler ${frameworkValue}` : ''}`);
+  }
+
+  // Update answers for validation - use frameworkValue for requirement checks
+  const validationAnswers = {
+    ...answers,
+    framework: frameworkValue || answers.framework
+  };
+
+  if (isFeatureValid(frameworkConfig, validationAnswers)) {
     const frameworkCommands = getFeatureCommands(frameworkConfig);
     commands.push(...frameworkCommands);
   } else {
@@ -176,36 +213,41 @@ export function buildCommands(config = null, answers) {
   }
 
   // 2. CSS commands
-  if (answers.css) {
-    const cssConfig = commandsConfig.css[answers.css];
-    if (cssConfig && isFeatureValid(cssConfig, answers)) {
+  if (answers.css || answers.cssFramework) {
+    const cssValue = answers.css || answers.cssFramework;
+    const cssConfig = commandsConfig.css[cssValue];
+    if (cssConfig && isFeatureValid(cssConfig, validationAnswers)) {
       const cssCommands = getFeatureCommands(cssConfig);
       commands.push(...cssCommands);
     }
   }
 
   // 3. Component library commands
-  if (answers.components) {
-    const componentsConfig = commandsConfig.components[answers.components];
-    if (componentsConfig && isFeatureValid(componentsConfig, answers)) {
+  if (answers.components || answers.componentLibrary) {
+    const componentsValue = answers.components || answers.componentLibrary;
+    const componentsConfig = commandsConfig.components[componentsValue];
+    if (componentsConfig && isFeatureValid(componentsConfig, validationAnswers)) {
       const componentsCommands = getFeatureCommands(componentsConfig);
       commands.push(...componentsCommands);
     }
   }
 
   // 4. State management commands
-  if (answers.state) {
-    const stateConfig = commandsConfig.state[answers.state];
-    if (stateConfig && isFeatureValid(stateConfig, answers)) {
-      const stateCommands = getFeatureCommands(stateConfig);
-      commands.push(...stateCommands);
+  if (answers.state || answers.stateManagement) {
+    const stateValue = answers.state || answers.stateManagement;
+    if (stateValue && stateValue !== 'plain') {
+      const stateConfig = commandsConfig.state[stateValue];
+      if (stateConfig && isFeatureValid(stateConfig, validationAnswers)) {
+        const stateCommands = getFeatureCommands(stateConfig);
+        commands.push(...stateCommands);
+      }
     }
   }
 
   // 5. Auth commands
-  if (answers.auth) {
+  if (answers.auth && answers.auth !== 'none') {
     const authConfig = commandsConfig.auth[answers.auth];
-    if (authConfig && isFeatureValid(authConfig, answers)) {
+    if (authConfig && isFeatureValid(authConfig, validationAnswers)) {
       const authCommands = getFeatureCommands(authConfig);
       commands.push(...authCommands);
     }

@@ -49,3 +49,22 @@ for (const dir of generatorDirs) {
   }
 }
 
+// Copy additional generator files needed at runtime
+const generatorFiles = [
+  'commandBuilder.js',
+  'questionBuilder.js',
+  'commands.config.json'
+];
+
+for (const file of generatorFiles) {
+  const srcFile = join(srcGeneratorBase, file);
+  const distFile = join(distGeneratorBase, file);
+  
+  if (existsSync(srcFile)) {
+    copyFileSync(srcFile, distFile);
+    console.log(`✓ Copied generator/${file} to dist`);
+  } else {
+    console.warn(`⚠ Warning: generator/${file} not found in src`);
+  }
+}
+

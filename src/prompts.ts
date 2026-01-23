@@ -10,11 +10,26 @@ const __dirname = path.dirname(__filename);
 
 /**
  * Loads the commands configuration
+ * Tries multiple paths to handle both development and production builds
  */
 function loadConfig() {
-  const configPath = path.join(__dirname, 'generator', 'commands.config.json');
-  const configContent = fs.readFileSync(configPath, 'utf-8');
-  return JSON.parse(configContent);
+  // Try multiple possible locations
+  const possiblePaths = [
+    path.join(__dirname, 'generator', 'commands.config.json'), // Production: dist/generator/commands.config.json
+    path.join(__dirname, '..', 'src', 'generator', 'commands.config.json'), // Development fallback
+    path.join(__dirname, '..', '..', 'src', 'generator', 'commands.config.json'), // Alternative fallback
+  ];
+
+  for (const configPath of possiblePaths) {
+    if (fs.existsSync(configPath)) {
+      const configContent = fs.readFileSync(configPath, 'utf-8');
+      return JSON.parse(configContent);
+    }
+  }
+
+  throw new Error(
+    `Could not find commands.config.json. Tried:\n${possiblePaths.join('\n')}`
+  );
 }
 
 /**

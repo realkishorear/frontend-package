@@ -199,8 +199,9 @@ export async function askQuestions(): Promise<ProjectAnswers> {
       componentLibrary: answers.componentLibrary || answers.components,
       stateManagement: answers.stateManagement,
       auth: answers.auth,
-      template: answers.template
-    } as ProjectAnswers;
+      template: answers.template,
+      frameworkValue: answers.frameworkValue // Include frameworkValue for commandBuilder
+    } as ProjectAnswers & { frameworkValue?: string };
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(`Failed to collect user input: ${error.message}`);

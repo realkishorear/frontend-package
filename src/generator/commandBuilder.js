@@ -114,10 +114,12 @@ function validateConflicts(conflicts, answers) {
       if (key === 'framework' && value.includes(answers.framework)) {
         return false;
       }
-      if (key === 'css' && value.includes(answers.css)) {
+      const cssValue = answers.css || answers.cssFramework;
+      if (key === 'css' && cssValue && value.includes(cssValue)) {
         return false;
       }
-      if (key === 'components' && value.includes(answers.components)) {
+      const componentsValue = answers.components || answers.componentLibrary;
+      if (key === 'components' && componentsValue && value.includes(componentsValue)) {
         return false;
       }
       if (key === 'state' && answers.state && value.includes(answers.state)) {
@@ -240,10 +242,13 @@ export function buildCommands(config = null, answers) {
   // 3. Component library commands
   if (answers.components || answers.componentLibrary) {
     const componentsValue = answers.components || answers.componentLibrary;
-    const componentsConfig = commandsConfig.components[componentsValue];
-    if (componentsConfig && isFeatureValid(componentsConfig, validationAnswers)) {
-      const componentsCommands = getFeatureCommands(componentsConfig);
-      commands.push(...componentsCommands);
+    // Skip "plain" component library (no commands needed)
+    if (componentsValue && componentsValue !== 'plain') {
+      const componentsConfig = commandsConfig.components[componentsValue];
+      if (componentsConfig && isFeatureValid(componentsConfig, validationAnswers)) {
+        const componentsCommands = getFeatureCommands(componentsConfig);
+        commands.push(...componentsCommands);
+      }
     }
   }
 

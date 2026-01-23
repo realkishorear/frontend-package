@@ -193,7 +193,7 @@
       "label": "🔐 OIDC",
       "value": "oidc",
       "commands": [
-        "npm install @react-oauth/google @azure/msal-react @azure/msal-browser react-facebook-login"
+        "npm install --legacy-peer-deps @react-oauth/google @azure/msal-react @azure/msal-browser @greatsumini/react-facebook-login"
       ],
       "requires": [],
       "conflicts": []
